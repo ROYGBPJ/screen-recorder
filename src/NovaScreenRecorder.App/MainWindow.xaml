@@ -1,0 +1,71 @@
+<Window x:Class="NovaScreenRecorder.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Nova Screen Recorder" Height="820" Width="1180"
+        MinHeight="720" MinWidth="980" WindowStartupLocation="CenterScreen"
+        Background="#FF070B14" Foreground="#FFF3F8FF" KeyDown="Window_KeyDown">
+    <Window.Resources>
+        <Style TargetType="Button">
+            <Setter Property="Foreground" Value="#FFF3F8FF"/><Setter Property="Background" Value="#FF172337"/>
+            <Setter Property="BorderBrush" Value="#FF344761"/><Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="14,9"/><Setter Property="Margin" Value="4"/><Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Foreground" Value="#FFF3F8FF"/><Setter Property="Background" Value="#FF0B1220"/>
+            <Setter Property="BorderBrush" Value="#FF344761"/><Setter Property="Padding" Value="8"/><Setter Property="Margin" Value="3"/>
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Foreground" Value="#FF101827"/><Setter Property="Background" Value="#FFE8F2FF"/>
+            <Setter Property="Padding" Value="5"/><Setter Property="Margin" Value="3"/>
+        </Style>
+        <Style TargetType="CheckBox"><Setter Property="Margin" Value="4,7"/><Setter Property="Foreground" Value="#FFDCE8F8"/></Style>
+        <Style TargetType="TextBlock" x:Key="SectionLabel"><Setter Property="Foreground" Value="#FF74E5FF"/><Setter Property="FontSize" Value="12"/><Setter Property="FontWeight" Value="Bold"/></Style>
+    </Window.Resources>
+    <Grid Margin="22">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <DockPanel Grid.Row="0" Margin="0,0,0,16">
+            <StackPanel DockPanel.Dock="Left"><TextBlock Text="NOVA / CAPTURE SYSTEMS" FontSize="12" FontWeight="Bold" Foreground="#FF74E5FF"/><TextBlock Text="Screen Recorder" FontSize="30" FontWeight="SemiBold"/><TextBlock Text="Precision capture. Creator-grade control." Foreground="#FF9CAFC5" Margin="0,3,0,0"/></StackPanel>
+            <Border DockPanel.Dock="Right" Background="#FF111827" BorderBrush="#FF26364D" BorderThickness="1" CornerRadius="12" Padding="16" VerticalAlignment="Center"><StackPanel><TextBlock Text="RECORDING STATUS" FontSize="10" Foreground="#FF9CAFC5"/><TextBlock x:Name="StatusText" Text="READY" FontSize="16" FontWeight="Bold" Foreground="#FF74E5FF"/><TextBlock x:Name="ElapsedText" Text="00:00:00" FontSize="20" FontFamily="Consolas"/></StackPanel></Border>
+        </DockPanel>
+        <Grid Grid.Row="1"><Grid.ColumnDefinitions><ColumnDefinition Width="1.05*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="0.95*"/></Grid.ColumnDefinitions>
+            <Border Grid.Column="0" Background="#FF111827" BorderBrush="#FF26364D" BorderThickness="1" CornerRadius="16" Padding="18">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
+                    <TextBlock Text="CAPTURE STUDIO" Style="{StaticResource SectionLabel}"/><TextBlock Text="Your next recording starts here." FontSize="22" FontWeight="SemiBold" Margin="0,7,0,4"/><TextBlock Text="Record your desktop or a titled window, capture still screenshots, and manage recordings from one place." Foreground="#FF9CAFC5" TextWrapping="Wrap" Margin="0,0,0,14"/>
+                    <Border Background="#FF0B1220" CornerRadius="12" Padding="12" Margin="0,0,0,10"><StackPanel><TextBlock Text="SAVE LOCATION" Foreground="#FF9CAFC5" FontSize="11"/><TextBlock x:Name="OutputPathText" Text="Videos\Nova Recordings" TextWrapping="Wrap" Margin="0,5,0,6"/><WrapPanel><Button x:Name="ChooseFolderButton" Content="Choose folder" Click="ChooseFolderButton_Click"/><Button Content="Open recordings" Click="OpenFolderButton_Click"/></WrapPanel></StackPanel></Border>
+                    <TextBlock Text="CAPTURE SOURCE" Style="{StaticResource SectionLabel}" Margin="3,4,0,4"/>
+                    <TextBlock Text="Capture backend" Foreground="#FF9CAFC5" Margin="4,5,4,0"/><ComboBox x:Name="CaptureBackendCombo" SelectedIndex="0"><ComboBoxItem Content="Windows Graphics Capture (native)"/><ComboBoxItem Content="FFmpeg GDI capture (compatibility)"/></ComboBox>
+                    <WrapPanel><Button Content="Choose display / window (native picker)" Click="ChooseWgcItemButton_Click"/><Button Content="List monitors" Click="RefreshMonitorsButton_Click"/></WrapPanel>
+                    <TextBlock x:Name="SelectedCaptureText" Text="Native capture target: not selected" Foreground="#FF9CAFC5" TextWrapping="Wrap" Margin="4,3,4,4"/>
+                    <TextBlock Text="Monitor (compatibility capture)" Foreground="#FF9CAFC5" Margin="4,5,4,0"/><ComboBox x:Name="MonitorCombo" DisplayMemberPath="DisplayName"/>
+                    <ComboBox x:Name="CaptureModeCombo" SelectedIndex="0" SelectionChanged="CaptureModeCombo_SelectionChanged"><ComboBoxItem Content="Entire virtual desktop"/><ComboBoxItem Content="Selected monitor"/><ComboBoxItem Content="Window by title"/><ComboBoxItem Content="Custom region"/></ComboBox>
+                    <TextBlock Text="Window title (for window capture)" Foreground="#FF9CAFC5" Margin="4,5,4,0"/><TextBox x:Name="WindowTitleBox" Text="" ToolTip="Exact or partial visible window title"/>
+                    <TextBlock Text="Region: virtual-desktop left, top, width, height (physical pixels)" Foreground="#FF9CAFC5" Margin="4,5,4,0"/><Button Content="Select region visually" HorizontalAlignment="Left" Click="PickRegionButton_Click"/><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><TextBox x:Name="RegionXBox" Text="0"/><TextBox x:Name="RegionYBox" Grid.Column="1" Text="0"/><TextBox x:Name="RegionWidthBox" Grid.Column="2" Text="1280"/><TextBox x:Name="RegionHeightBox" Grid.Column="3" Text="720"/></Grid>
+                    <TextBlock Text="RECORDING CONTROLS" Style="{StaticResource SectionLabel}" Margin="3,12,0,4"/><WrapPanel><Button x:Name="StartButton" Content="●  Start recording" Background="#FF0C7898" BorderBrush="#FF74E5FF" Click="StartButton_Click"/><Button x:Name="PauseButton" Content="Ⅱ  Pause" IsEnabled="False" Click="PauseButton_Click"/><Button x:Name="StopButton" Content="■  Stop" IsEnabled="False" Click="StopButton_Click"/><Button x:Name="ScreenshotButton" Content="▣  Screenshot" Click="ScreenshotButton_Click"/></WrapPanel>
+                    <TextBlock x:Name="MessageText" Text="Configure FFmpeg in the settings panel if it is not installed on PATH." Foreground="#FF9CAFC5" TextWrapping="Wrap" Margin="4,12,4,0"/>
+                    <Separator Margin="0,14" Background="#FF26364D"/>
+                    <TextBlock Text="RECORDINGS LIBRARY" Style="{StaticResource SectionLabel}"/>
+                    <TextBlock Text="Latest 100 videos and screenshots in your selected save folder." Foreground="#FF9CAFC5" TextWrapping="Wrap" Margin="3,5,3,7"/>
+                    <ListBox x:Name="RecordingsListBox" Height="155" Background="#FF0B1220" Foreground="#FFF3F8FF" BorderBrush="#FF344761" MouseDoubleClick="OpenSelectedRecordingButton_Click"/>
+                    <WrapPanel><Button Content="Refresh library" Click="RefreshRecordingsButton_Click"/><Button Content="Open selected" Click="OpenSelectedRecordingButton_Click"/><Button Content="Delete selected" Click="DeleteSelectedRecordingButton_Click"/></WrapPanel>
+                    <TextBlock Text="TRIM / EXPORT" Style="{StaticResource SectionLabel}" Margin="3,12,0,4"/><TextBlock Text="Start and end times (HH:MM:SS)" Foreground="#FF9CAFC5" Margin="4,3,4,0"/><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><TextBox x:Name="TrimStartBox" Text="00:00:00"/><TextBox x:Name="TrimEndBox" Grid.Column="1" Text="00:00:10"/></Grid><Button Content="Trim selected to new file" HorizontalAlignment="Left" Click="TrimSelectedButton_Click"/>
+                </StackPanel></ScrollViewer>
+            </Border>
+            <Border Grid.Column="2" Background="#FF111827" BorderBrush="#FF26364D" BorderThickness="1" CornerRadius="16" Padding="18">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
+                    <TextBlock Text="RECORDING CONFIGURATION" Style="{StaticResource SectionLabel}"/><TextBlock Text="Quality &amp; performance" FontSize="20" FontWeight="SemiBold" Margin="0,7,0,4"/>
+                    <TextBlock Text="Video encoder (auto falls back to CPU)" Margin="4,10,4,2"/><ComboBox x:Name="EncoderCombo" SelectedIndex="0"><ComboBoxItem Content="Automatic (hardware if available)"/><ComboBoxItem Content="CPU / compatible fallback"/><ComboBoxItem Content="NVIDIA NVENC"/><ComboBoxItem Content="Intel Quick Sync"/><ComboBoxItem Content="AMD AMF"/></ComboBox><Button Content="Detect available encoders" HorizontalAlignment="Left" Click="DetectEncodersButton_Click"/><TextBlock Text="Video quality" Margin="4,10,4,2"/><ComboBox x:Name="QualityCombo" SelectedIndex="1"><ComboBoxItem Content="High efficiency"/><ComboBoxItem Content="Balanced"/><ComboBoxItem Content="High quality"/><ComboBoxItem Content="Visually lossless"/></ComboBox>
+                    <TextBlock Text="Frame rate" Margin="4,10,4,2"/><ComboBox x:Name="FpsCombo" SelectedIndex="1"><ComboBoxItem Content="30 FPS"/><ComboBoxItem Content="60 FPS"/><ComboBoxItem Content="120 FPS"/></ComboBox>
+                    <TextBlock Text="Output format" Margin="4,10,4,2"/><ComboBox x:Name="FormatCombo" SelectedIndex="0"><ComboBoxItem Content="MP4 (widely compatible)"/><ComboBoxItem Content="MKV (more crash resilient)"/></ComboBox>
+                    <TextBlock Text="FFmpeg executable path" Margin="4,10,4,2"/><TextBox x:Name="FfmpegPathBox" Text="ffmpeg.exe"/><Button Content="Check FFmpeg" HorizontalAlignment="Left" Click="CheckFfmpegButton_Click"/>
+                    <Separator Margin="0,14" Background="#FF26364D"/>
+                    <TextBlock Text="AUDIO INPUTS" Style="{StaticResource SectionLabel}"/><CheckBox x:Name="MicCheckBox" Content="Record microphone (DirectShow)"/><TextBlock Text="Exact microphone device name" Foreground="#FF9CAFC5" Margin="4,0,4,0"/><TextBox x:Name="MicDeviceBox" Text=""/><Button Content="List microphone devices" HorizontalAlignment="Left" Click="ListDevicesButton_Click"/>
+                    <CheckBox x:Name="DesktopAudioCheckBox" Content="Try desktop audio loopback (FFmpeg WASAPI)"/>
+                    <CheckBox x:Name="WebcamCheckBox" Content="Overlay webcam (DirectShow)"/><TextBlock Text="Exact webcam device name" Foreground="#FF9CAFC5" Margin="4,0,4,0"/><TextBox x:Name="WebcamDeviceBox" Text=""/><TextBlock Text="Picture-in-picture size and position" Foreground="#FF9CAFC5" Margin="4,4,4,0"/><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><TextBox x:Name="WebcamWidthBox" Text="320" ToolTip="Overlay width in pixels (64–1280)"/><ComboBox x:Name="WebcamPositionCombo" Grid.Column="1" SelectedIndex="0"><ComboBoxItem Content="Bottom right"/><ComboBoxItem Content="Bottom left"/><ComboBoxItem Content="Top right"/><ComboBoxItem Content="Top left"/></ComboBox></Grid><TextBlock Text="Webcam support depends on the FFmpeg build and camera driver. Position and width apply to the next recording." FontSize="11" Foreground="#FF9CAFC5" TextWrapping="Wrap" Margin="4,0,4,4"/><TextBlock Text="Desktop loopback availability depends on the FFmpeg build and Windows audio devices." FontSize="11" Foreground="#FF9CAFC5" TextWrapping="Wrap" Margin="4,0,4,0"/>
+                    <Separator Margin="0,14" Background="#FF26364D"/>
+                    <TextBlock Text="WORKFLOW" Style="{StaticResource SectionLabel}"/><TextBlock Text="Countdown before start (seconds)" Margin="4,4,4,0"/><TextBox x:Name="CountdownSecondsBox" Text="0"/><CheckBox x:Name="ScheduleCheckBox" Content="Schedule recording instead of starting now"/><TextBlock Text="Scheduled date and time (local time)" Foreground="#FF9CAFC5" Margin="4,0,4,0"/><DatePicker x:Name="ScheduleDatePicker"/><TextBox x:Name="ScheduleTimeBox" Text="18:00" ToolTip="24-hour time HH:mm"/><Button Content="Cancel scheduled recording" HorizontalAlignment="Left" Click="CancelScheduleButton_Click"/><CheckBox x:Name="CursorCheckBox" Content="Show mouse cursor in recording" IsChecked="True"/><CheckBox x:Name="AutoOpenCheckBox" Content="Open output folder after stopping" IsChecked="False"/><TextBlock Text="Global shortcuts: Ctrl+Shift+R start/stop • Ctrl+Shift+P pause/resume • Ctrl+Shift+S screenshot. If another app owns a shortcut, Nova logs that and in-app shortcuts still work." FontSize="11" Foreground="#FF9CAFC5" TextWrapping="Wrap" Margin="4,8,4,0"/><Separator Margin="0,14" Background="#FF26364D"/><TextBlock Text="ERROR DIAGNOSTICS" Style="{StaticResource SectionLabel}"/><CheckBox x:Name="DiagnosticsCheckBox" Content="Keep error logs on this PC" IsChecked="True" Checked="DiagnosticsCheckBox_Changed" Unchecked="DiagnosticsCheckBox_Changed"/><TextBlock Text="Logs contain error details and FFmpeg error output. They stay in the Error folder indefinitely unless you manually delete them. Nothing is uploaded. Turn this off to stop collecting new logs; existing files remain." FontSize="11" Foreground="#FF9CAFC5" TextWrapping="Wrap" Margin="4,0,4,6"/><Button Content="Open Error folder" HorizontalAlignment="Left" Click="OpenErrorFolderButton_Click"/><TextBlock Text="Local location: %LOCALAPPDATA%\NovaScreenRecorder\Error" FontSize="10" Foreground="#FF71839B" TextWrapping="Wrap" Margin="4,4,4,0"/>
+                </StackPanel></ScrollViewer>
+            </Border>
+        </Grid>
+        <DockPanel Grid.Row="2" Margin="2,12,2,0"><TextBlock DockPanel.Dock="Left" Text="NOVA • WINDOWS 11 • X64" Foreground="#FF71839B" VerticalAlignment="Center"/><TextBlock DockPanel.Dock="Right" Text="FFmpeg capture engine • Custom branding ready" Foreground="#FF71839B" VerticalAlignment="Center"/></DockPanel>
+    </Grid>
+</Window>

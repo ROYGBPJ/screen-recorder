@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NovaScreenRecorder.App", "src\NovaScreenRecorder.App\NovaScreenRecorder.App.csproj", "{8F9F0F7A-7E5B-4C67-9E56-28F89D2D6B11}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NovaScreenRecorder.Tests", "tests\NovaScreenRecorder.Tests\NovaScreenRecorder.Tests.csproj", "{9A5E4D31-FA76-4DB2-BE7A-4A2D03C9D681}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8F9F0F7A-7E5B-4C67-9E56-28F89D2D6B11}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8F9F0F7A-7E5B-4C67-9E56-28F89D2D6B11}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8F9F0F7A-7E5B-4C67-9E56-28F89D2D6B11}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8F9F0F7A-7E5B-4C67-9E56-28F89D2D6B11}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9A5E4D31-FA76-4DB2-BE7A-4A2D03C9D681}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9A5E4D31-FA76-4DB2-BE7A-4A2D03C9D681}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9A5E4D31-FA76-4DB2-BE7A-4A2D03C9D681}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9A5E4D31-FA76-4DB2-BE7A-4A2D03C9D681}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
