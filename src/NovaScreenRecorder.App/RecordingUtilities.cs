@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.IO;
 
 namespace NovaScreenRecorder.App;
 
