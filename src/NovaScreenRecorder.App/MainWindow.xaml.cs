@@ -271,10 +271,13 @@ public partial class MainWindow : Window
         if (webcam && (!int.TryParse(WebcamWidthBox.Text, out webcamWidth) || webcamWidth < 64 || webcamWidth > 1280)) { ShowError("Webcam overlay width must be between 64 and 1280 pixels."); return; }
         int nextInput = 1;
         int? webcamInput = null;
-        if (webcam) { webcamInput = nextInput++; args.AddRange(new[] { "-f", "dshow", "-i", $"video=\"{WebcamDeviceBox.Text.Trim().Trim('"')}\"" }); }
+        // ProcessStartInfo.ArgumentList already preserves each argument as one token.
+        // Do not include shell-style quotes inside DirectShow input values: FFmpeg then
+        // treats the quote characters as part of the device name and cannot open it.
+        if (webcam) { webcamInput = nextInput++; args.AddRange(new[] { "-f", "dshow", "-i", $"video={WebcamDeviceBox.Text.Trim().Trim('"')}" }); }
         int? micInput = null, desktopInput = null;
-        if (mic) { micInput = nextInput++; args.AddRange(new[] { "-f", "dshow", "-i", $"audio=\"{MicDeviceBox.Text.Trim().Trim('"')}\"" }); }
-        if (desktopAudio) { desktopInput = nextInput++; args.AddRange(new[] { "-f", "dshow", "-i", $"audio=\"{DesktopAudioDeviceBox.Text.Trim().Trim('"')}\"" }); }
+        if (mic) { micInput = nextInput++; args.AddRange(new[] { "-f", "dshow", "-i", $"audio={MicDeviceBox.Text.Trim().Trim('"')}" }); }
+        if (desktopAudio) { desktopInput = nextInput++; args.AddRange(new[] { "-f", "dshow", "-i", $"audio={DesktopAudioDeviceBox.Text.Trim().Trim('"')}" }); }
         var filterParts = new List<string>();
         var outputMaps = new List<string>();
         if (webcam)
