@@ -78,7 +78,7 @@ public partial class MainWindow : Window
             if (!_allowClose && _ffmpeg is { HasExited: false })
             {
                 e.Cancel = true;
-                var answer = MessageBox.Show(this,
+                var answer = System.Windows.MessageBox.Show(this,
                     "A recording is still active. Stop and finalize the file before closing Nova?",
                     "Recording in progress", MessageBoxButton.YesNo, MessageBoxImage.Warning);
                 if (answer == MessageBoxResult.Yes)
@@ -343,7 +343,7 @@ public partial class MainWindow : Window
             }
             _recordingReady = true;
             _recordingStarted = DateTime.Now; _pausedElapsed = TimeSpan.Zero; _isPaused = false; _timer.Start();
-            StatusText.Text = "RECORDING"; StatusText.Foreground = Brushes.OrangeRed; MessageText.Text = $"Recording to: {_currentOutput}\nEncoder: {_activeEncoder} • Backend: {(_isWgcRecording ? "Windows Graphics Capture" : "FFmpeg GDI compatibility")}";
+            StatusText.Text = "RECORDING"; StatusText.Foreground = System.Windows.Media.Brushes.OrangeRed; MessageText.Text = $"Recording to: {_currentOutput}\nEncoder: {_activeEncoder} • Backend: {(_isWgcRecording ? "Windows Graphics Capture" : "FFmpeg GDI compatibility")}";
             StartButton.IsEnabled = false; PauseButton.IsEnabled = true; StopButton.IsEnabled = true; ScreenshotButton.IsEnabled = false; ChooseFolderButton.IsEnabled = false;
             SetConfigurationEnabled(false); PauseButton.Content = "Ⅱ  Pause"; SaveSettings();
             RefreshRecordingsLibrary();
@@ -373,12 +373,12 @@ public partial class MainWindow : Window
             if (_isPaused)
             {
                 _recordingStarted = DateTime.Now - _pausedElapsed; _isPaused = false; _timer.Start();
-                StatusText.Text = "RECORDING"; StatusText.Foreground = Brushes.OrangeRed; PauseButton.Content = "Ⅱ  Pause"; MessageText.Text = "Recording resumed.";
+                StatusText.Text = "RECORDING"; StatusText.Foreground = System.Windows.Media.Brushes.OrangeRed; PauseButton.Content = "Ⅱ  Pause"; MessageText.Text = "Recording resumed.";
             }
             else
             {
                 _pausedElapsed = DateTime.Now - _recordingStarted; _isPaused = true; _timer.Stop();
-                StatusText.Text = "PAUSED"; StatusText.Foreground = Brushes.Gold; PauseButton.Content = "▶  Resume"; MessageText.Text = "Recording process paused. Stop to finalize the file.";
+                StatusText.Text = "PAUSED"; StatusText.Foreground = System.Windows.Media.Brushes.Gold; PauseButton.Content = "▶  Resume"; MessageText.Text = "Recording process paused. Stop to finalize the file.";
             }
         }
         catch (Exception ex) { ErrorLogService.WriteException("Pause/resume", ex); MessageText.Text = $"Pause/resume failed: {ex.Message}"; }
@@ -421,7 +421,7 @@ public partial class MainWindow : Window
             process.Dispose(); _ffmpeg = null; _recordingReady = false; _isWgcRecording = false;
             if (finalizedCleanly && _recoveryMarker is not null && File.Exists(_recoveryMarker)) { try { File.Delete(_recoveryMarker); } catch (Exception ex) { ErrorLogService.WriteException("Delete recovery marker", ex); } }
             else if (_recoveryMarker is not null && File.Exists(_recoveryMarker)) _stopWarning ??= "The recording may be incomplete; a recovery marker was kept for the next launch.";
-            _recoveryMarker = null; StatusText.Text = "READY"; StatusText.Foreground = Brushes.LightSkyBlue; ElapsedText.Text = "00:00:00";
+            _recoveryMarker = null; StatusText.Text = "READY"; StatusText.Foreground = System.Windows.Media.Brushes.LightSkyBlue; ElapsedText.Text = "00:00:00";
             StartButton.IsEnabled = true; PauseButton.IsEnabled = false; StopButton.IsEnabled = false; ScreenshotButton.IsEnabled = true; ChooseFolderButton.IsEnabled = true; SetConfigurationEnabled(true);
             MessageText.Text = File.Exists(_currentOutput)
                 ? $"Recording saved: {_currentOutput}" + (_stopWarning is null ? string.Empty : Environment.NewLine + _stopWarning)
@@ -512,7 +512,7 @@ public partial class MainWindow : Window
         if (_ffmpeg is null || !_ffmpeg.HasExited || _isStopping || !_recordingReady) return;
         var failedEncoder = _activeEncoder;
         var failedProcess = _ffmpeg;
-        _timer.Stop(); StatusText.Text = "STOPPED"; StatusText.Foreground = Brushes.Gold;
+        _timer.Stop(); StatusText.Text = "STOPPED"; StatusText.Foreground = System.Windows.Media.Brushes.Gold;
         StartButton.IsEnabled = true; PauseButton.IsEnabled = false; StopButton.IsEnabled = false; ScreenshotButton.IsEnabled = true; ChooseFolderButton.IsEnabled = true; SetConfigurationEnabled(true);
         ErrorLogService.Write("FFMPEG", $"FFmpeg exited unexpectedly. Exit code={failedProcess.ExitCode}; encoder={failedEncoder}; output={_currentOutput ?? "(not set)"}");
         if (_isWgcRecording) { try { await _wgc.StopAsync(); } catch (Exception ex) { ErrorLogService.WriteException("Stop capture after encoder failure", ex); } }
@@ -702,10 +702,10 @@ public partial class MainWindow : Window
                 try { using var proc = Process.GetProcessById(marker.ProcessId); ffmpegStillRunning = !proc.HasExited && proc.ProcessName.Contains("ffmpeg", StringComparison.OrdinalIgnoreCase); } catch { }
                 if (ffmpegStillRunning)
                 {
-                    MessageBox.Show(this, $"An earlier FFmpeg process (PID {marker.ProcessId}) may still be recording:\n{marker.OutputPath}\n\nStop that process before attempting recovery.", "Nova recovery", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    System.Windows.MessageBox.Show(this, $"An earlier FFmpeg process (PID {marker.ProcessId}) may still be recording:\n{marker.OutputPath}\n\nStop that process before attempting recovery.", "Nova recovery", MessageBoxButton.OK, MessageBoxImage.Warning);
                     continue;
                 }
-                if (MessageBox.Show(this, $"Nova found a recording that may not have been finalized:\n\n{marker.OutputPath}\n\nAttempt to recover readable frames into a new MKV file? The original will be preserved.", "Recover interrupted recording", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) continue;
+                if (System.Windows.MessageBox.Show(this, $"Nova found a recording that may not have been finalized:\n\n{marker.OutputPath}\n\nAttempt to recover readable frames into a new MKV file? The original will be preserved.", "Recover interrupted recording", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) continue;
                 _ = RecoverOneAsync(markerPath, marker);
             }
         }
@@ -779,7 +779,7 @@ public partial class MainWindow : Window
         { MessageText.Text = "Select an existing recording or screenshot first."; return; }
         if (string.Equals(path, _currentOutput, StringComparison.OrdinalIgnoreCase) && _ffmpeg is { HasExited: false })
         { ShowError("You cannot delete the file that is currently being recorded."); return; }
-        if (MessageBox.Show(this, $"Permanently delete this file?\n\n{Path.GetFileName(path)}", "Delete recording", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        if (System.Windows.MessageBox.Show(this, $"Permanently delete this file?\n\n{Path.GetFileName(path)}", "Delete recording", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
         try { File.Delete(path); RefreshRecordingsLibrary(); MessageText.Text = "File deleted."; }
         catch (Exception ex) { ErrorLogService.WriteException("Delete recording", ex, path); ShowError($"Could not delete the file: {ex.Message}"); }
     }
@@ -837,7 +837,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             ErrorLogService.WriteException("Open Error folder", ex);
-            MessageBox.Show(this, $"Could not open Error folder: {ex.Message}", "Nova Screen Recorder", MessageBoxButton.OK, MessageBoxImage.Warning);
+            System.Windows.MessageBox.Show(this, $"Could not open Error folder: {ex.Message}", "Nova Screen Recorder", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -845,7 +845,7 @@ public partial class MainWindow : Window
     {
         ErrorLogService.Write("ERROR", message);
         MessageText.Text = message;
-        MessageBox.Show(this, message, "Nova Screen Recorder", MessageBoxButton.OK, MessageBoxImage.Warning);
+        System.Windows.MessageBox.Show(this, message, "Nova Screen Recorder", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     private sealed record MonitorChoice(string DeviceName, Rectangle Bounds, bool Primary)
