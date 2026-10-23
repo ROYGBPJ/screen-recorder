@@ -1,0 +1,114 @@
+name: Build Nova Screen Recorder
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ "v*" ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Validate project structure and XAML event handlers
+        shell: pwsh
+        run: .\scripts\Validate-Project.ps1
+
+      - name: Restore
+        run: dotnet restore .\NovaScreenRecorder.sln
+
+      - name: Build and verify
+        run: dotnet build .\NovaScreenRecorder.sln --configuration Release --no-restore
+
+      - name: Run automated unit tests
+        run: dotnet test .\tests\NovaScreenRecorder.Tests\NovaScreenRecorder.Tests.csproj --configuration Release --no-build --results-directory .\tests\NovaScreenRecorder.Tests\TestResults --logger "trx;LogFileName=nova-tests.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: NovaScreenRecorder-Test-Results
+          path: tests/NovaScreenRecorder.Tests/TestResults/*.trx
+          if-no-files-found: ignore
+
+      - name: Publish self-contained Windows x64 app
+        shell: pwsh
+        run: |
+          dotnet publish .\src\NovaScreenRecorder.App\NovaScreenRecorder.App.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            -p:DebugType=None `
+            -p:DebugSymbols=false `
+            -o .\artifacts\publish\win-x64
+          if (!(Test-Path .\artifacts\publish\win-x64\NovaScreenRecorder.App.exe)) { throw "Publish did not produce NovaScreenRecorder.App.exe" }
+
+      - name: Download FFmpeg LGPL build
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'ffmpeg-lgpl.zip'
+          $extract = Join-Path $env:RUNNER_TEMP 'ffmpeg-extract'
+          Invoke-WebRequest -Uri 'https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-lgpl.zip' -OutFile $archive
+          Expand-Archive -Path $archive -DestinationPath $extract -Force
+          $ffmpeg = Get-ChildItem -Path $extract -Filter ffmpeg.exe -Recurse | Select-Object -First 1
+          if (!$ffmpeg) { throw 'FFmpeg archive did not contain ffmpeg.exe' }
+          # BtbN shared builds can require sibling DLLs, so copy the complete bin directory, not just ffmpeg.exe.
+          Get-ChildItem -Path $ffmpeg.DirectoryName -File | Copy-Item -Destination '.\artifacts\publish\win-x64' -Force
+          $notices = Join-Path (Resolve-Path '.\artifacts\publish\win-x64') 'FFmpeg-LGPL-Notices'
+          New-Item -ItemType Directory -Path $notices -Force | Out-Null
+          Get-ChildItem -Path $extract -Recurse -File | Where-Object { $_.Name -match '^(LICENSE|COPYING|README|NOTICE)' } | ForEach-Object {
+            Copy-Item $_.FullName (Join-Path $notices ($_.Directory.Name + '-' + $_.Name)) -Force
+          }
+          if (!(Get-ChildItem $notices -File | Where-Object { $_.Name -match 'LICENSE|COPYING' })) { throw 'FFmpeg LGPL license files were not found in the downloaded build.' }
+          $encoders = (& '.\artifacts\publish\win-x64\ffmpeg.exe' -hide_banner -encoders 2>&1 | Out-String)
+          if ($encoders -notmatch '\bmpeg4\b') { throw 'Bundled FFmpeg has no MPEG-4 fallback encoder.' }
+          $smoke = Join-Path $env:RUNNER_TEMP 'nova-ffmpeg-smoke.mp4'
+          & '.\artifacts\publish\win-x64\ffmpeg.exe' -hide_banner -f lavfi -i 'testsrc=size=640x360:rate=30' -f lavfi -i 'sine=frequency=880:sample_rate=44100' -t 2 -c:v mpeg4 -q:v 4 -pix_fmt yuv420p -c:a aac -y $smoke
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path $smoke)) { throw 'Bundled FFmpeg synthetic audio/video smoke test failed.' }
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (!(Test-Path $iscc)) { throw "Inno Setup compiler not found at $iscc" }
+          & $iscc '.\installer\NovaScreenRecorder.iss'
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
+          if (!(Test-Path '.\artifacts\NovaScreenRecorder-Setup-win-x64.exe')) { throw 'Installer EXE was not created.' }
+
+      - name: Package portable app
+        shell: pwsh
+        run: |
+          Compress-Archive -Path .\artifacts\publish\win-x64\* -DestinationPath .\artifacts\NovaScreenRecorder-win-x64.zip -Force
+
+      - name: Upload downloadable Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: NovaScreenRecorder-win-x64
+          path: |
+            artifacts/NovaScreenRecorder-win-x64.zip
+            artifacts/NovaScreenRecorder-Setup-win-x64.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release for version tags
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Nova Screen Recorder ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            artifacts/NovaScreenRecorder-win-x64.zip
+            artifacts/NovaScreenRecorder-Setup-win-x64.exe
