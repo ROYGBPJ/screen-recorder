@@ -27,6 +27,7 @@ public partial class MainWindow : Window
     private bool _diagnosticsEnabled = true;
     private bool _isStopping;
     private bool _recordingReady;
+    private bool _lastFfmpegInputFailure;
     private bool _allowClose;
     private string? _stopWarning;
     private HwndSource? _windowSource;
@@ -109,6 +110,7 @@ public partial class MainWindow : Window
             if (lines.Length > 4) WebcamDeviceBox.Text = lines[4];
             if (lines.Length > 5 && int.TryParse(lines[5], out int webcamWidth) && webcamWidth >= 64 && webcamWidth <= 1280) WebcamWidthBox.Text = webcamWidth.ToString();
             if (lines.Length > 6 && int.TryParse(lines[6], out int webcamPosition) && webcamPosition >= 0 && webcamPosition < WebcamPositionCombo.Items.Count) WebcamPositionCombo.SelectedIndex = webcamPosition;
+            if (lines.Length > 7 && !string.IsNullOrWhiteSpace(lines[7])) DesktopAudioDeviceBox.Text = lines[7];
             ErrorLogService.Initialize(_diagnosticsEnabled);
             if (DiagnosticsCheckBox is not null) DiagnosticsCheckBox.IsChecked = _diagnosticsEnabled;
             OutputPathText.Text = _outputFolder;
@@ -123,7 +125,7 @@ public partial class MainWindow : Window
             Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
             _diagnosticsEnabled = DiagnosticsCheckBox?.IsChecked != false;
             ErrorLogService.Enabled = _diagnosticsEnabled;
-            File.WriteAllLines(SettingsPath, new[] { _outputFolder, FfmpegPathBox.Text.Trim(), MicDeviceBox.Text.Trim(), _diagnosticsEnabled.ToString(), WebcamDeviceBox.Text.Trim(), WebcamWidthBox.Text.Trim(), WebcamPositionCombo.SelectedIndex.ToString() });
+            File.WriteAllLines(SettingsPath, new[] { _outputFolder, FfmpegPathBox.Text.Trim(), MicDeviceBox.Text.Trim(), _diagnosticsEnabled.ToString(), WebcamDeviceBox.Text.Trim(), WebcamWidthBox.Text.Trim(), WebcamPositionCombo.SelectedIndex.ToString(), DesktopAudioDeviceBox.Text.Trim() });
         }
         catch (Exception ex) { ErrorLogService.WriteException("Save settings", ex); }
     }
@@ -201,9 +203,13 @@ public partial class MainWindow : Window
         if (CaptureBackendCombo.SelectedIndex == 0 && !WindowsGraphicsCaptureService.IsSupported)
         { ShowError("Windows Graphics Capture is not supported on this Windows build. Choose FFmpeg GDI compatibility capture instead."); return; }
         await DetectEncodersAsync();
-        if (MicCheckBox.IsChecked == true && string.IsNullOrWhiteSpace(MicDeviceBox.Text))
+        if (MicCheckBox.IsChecked == true && string.IsNullOrWhiteSpace(MicDeviceBox.Text.Trim().Trim('"')))
         {
             ShowError("Enter the exact DirectShow microphone device name, or turn microphone recording off."); return;
+        }
+        if (DesktopAudioCheckBox.IsChecked == true && string.IsNullOrWhiteSpace(DesktopAudioDeviceBox.Text.Trim().Trim('"')))
+        {
+            ShowError("Enter the exact DirectShow desktop-audio loopback device name (for example, Stereo Mix), or turn desktop audio off."); return;
         }
         if (CaptureBackendCombo.SelectedIndex != 0 && CaptureModeCombo.SelectedIndex == 2 && string.IsNullOrWhiteSpace(WindowTitleBox.Text))
         {
@@ -265,10 +271,10 @@ public partial class MainWindow : Window
         if (webcam && (!int.TryParse(WebcamWidthBox.Text, out webcamWidth) || webcamWidth < 64 || webcamWidth > 1280)) { ShowError("Webcam overlay width must be between 64 and 1280 pixels."); return; }
         int nextInput = 1;
         int? webcamInput = null;
-        if (webcam) { webcamInput = nextInput++; args.AddRange(new[] { "-f", "dshow", "-i", $"video={WebcamDeviceBox.Text.Trim()}" }); }
+        if (webcam) { webcamInput = nextInput++; args.AddRange(new[] { "-f", "dshow", "-i", $"video=\"{WebcamDeviceBox.Text.Trim().Trim('"')}\"" }); }
         int? micInput = null, desktopInput = null;
-        if (mic) { micInput = nextInput++; args.AddRange(new[] { "-f", "dshow", "-i", $"audio={MicDeviceBox.Text.Trim()}" }); }
-        if (desktopAudio) { desktopInput = nextInput++; args.AddRange(new[] { "-f", "wasapi", "-i", "default" }); }
+        if (mic) { micInput = nextInput++; args.AddRange(new[] { "-f", "dshow", "-i", $"audio=\"{MicDeviceBox.Text.Trim().Trim('"')}\"" }); }
+        if (desktopAudio) { desktopInput = nextInput++; args.AddRange(new[] { "-f", "dshow", "-i", $"audio=\"{DesktopAudioDeviceBox.Text.Trim().Trim('"')}\"" }); }
         var filterParts = new List<string>();
         var outputMaps = new List<string>();
         if (webcam)
@@ -304,6 +310,7 @@ public partial class MainWindow : Window
 
         try
         {
+            _lastFfmpegInputFailure = false;
             var startInfo = CreateProcessStartInfo(args, redirectInput: true, redirectOutput: true, redirectError: true);
             _ffmpeg = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
             _isStopping = false;
@@ -312,6 +319,11 @@ public partial class MainWindow : Window
             _ffmpeg.ErrorDataReceived += (_, ev) =>
             {
                 if (ev.Data is null) return;
+                if (ev.Data.Contains("Error opening input", StringComparison.OrdinalIgnoreCase) ||
+                    ev.Data.Contains("Could not open input", StringComparison.OrdinalIgnoreCase) ||
+                    ev.Data.Contains("Could not find audio device", StringComparison.OrdinalIgnoreCase) ||
+                    ev.Data.Contains("No such device", StringComparison.OrdinalIgnoreCase))
+                    _lastFfmpegInputFailure = true;
                 if (ev.Data.Contains("error", StringComparison.OrdinalIgnoreCase) ||
                     ev.Data.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
                     ev.Data.Contains("invalid", StringComparison.OrdinalIgnoreCase) ||
@@ -334,7 +346,7 @@ public partial class MainWindow : Window
                 _ffmpeg.Dispose(); _ffmpeg = null;
                 if (_isWgcRecording) { try { await _wgc.StopAsync(); } catch { } }
                 if (_recoveryMarker is not null) { try { File.Delete(_recoveryMarker); } catch { } _recoveryMarker = null; }
-                if (_automaticEncoder && failedEncoder != "mpeg4" && _failedEncoders.Add(failedEncoder))
+                if (!_lastFfmpegInputFailure && _automaticEncoder && failedEncoder != "mpeg4" && _failedEncoders.Add(failedEncoder))
                 {
                     MessageText.Text = $"Encoder {failedEncoder} failed to initialize; retrying with the next available encoder.";
                     await StartRecordingAsync(true, true); return;
@@ -501,7 +513,7 @@ public partial class MainWindow : Window
             if (p is null) throw new InvalidOperationException("FFmpeg could not be launched.");
             string output = await p.StandardError.ReadToEndAsync(); await p.WaitForExitAsync();
             string path = Path.Combine(_outputFolder, "Nova-Audio-Devices.txt"); File.WriteAllText(path, output);
-            MessageText.Text = $"Device list saved to {path}. Open it and copy the exact microphone name into the microphone field.";
+            MessageText.Text = $"Device list saved to {path}. Open it and copy the exact DirectShow audio/video device name into the matching field.";
             Process.Start(new ProcessStartInfo("notepad.exe", path) { UseShellExecute = true });
         }
         catch (Exception ex) { ErrorLogService.WriteException("List audio devices", ex); ShowError($"Could not list audio devices: {ex.Message}"); }
@@ -520,7 +532,7 @@ public partial class MainWindow : Window
         MessageText.Text = "FFmpeg exited. Review the Error folder and inspect the output file.";
         try { failedProcess.Dispose(); } catch { } _ffmpeg = null; _recordingReady = false;
         RefreshRecordingsLibrary();
-        if (_automaticEncoder && failedEncoder != "mpeg4" && _failedEncoders.Add(failedEncoder))
+        if (!_lastFfmpegInputFailure && _automaticEncoder && failedEncoder != "mpeg4" && _failedEncoders.Add(failedEncoder))
         {
             MessageText.Text = $"Encoder {failedEncoder} stopped unexpectedly. Retrying with the next available encoder.";
             await StartRecordingAsync(true, true);
