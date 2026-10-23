@@ -17,6 +17,62 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
+      - name: Convert uploaded JPG logo into multi-resolution Windows icon
+        shell: pwsh
+        run: |
+          $source = '.\src\NovaScreenRecorder.App\NovaScreenRecorder-Icon.jpg'
+          $target = '.\src\NovaScreenRecorder.App\NovaScreenRecorder-Icon.ico'
+          if (!(Test-Path $source)) { throw "Logo image not found: $source" }
+          Add-Type -AssemblyName System.Drawing
+          $original = [System.Drawing.Image]::FromFile((Resolve-Path $source))
+          try {
+            $sizes = @(16, 24, 32, 48, 64, 128, 256)
+            $images = @()
+            foreach ($size in $sizes) {
+              $bitmap = New-Object System.Drawing.Bitmap($size, $size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+              $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+              try {
+                $graphics.Clear([System.Drawing.Color]::Transparent)
+                $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+                $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+                $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+                $scale = [Math]::Min($size / $original.Width, $size / $original.Height)
+                $width = [Math]::Max(1, [int][Math]::Round($original.Width * $scale))
+                $height = [Math]::Max(1, [int][Math]::Round($original.Height * $scale))
+                $x = [int][Math]::Floor(($size - $width) / 2)
+                $y = [int][Math]::Floor(($size - $height) / 2)
+                $graphics.DrawImage($original, $x, $y, $width, $height)
+                $memory = New-Object System.IO.MemoryStream
+                try {
+                  $bitmap.Save($memory, [System.Drawing.Imaging.ImageFormat]::Png)
+                  $images += ,([pscustomobject]@{ Size = $size; Bytes = $memory.ToArray() })
+                } finally { $memory.Dispose() }
+              } finally { $graphics.Dispose(); $bitmap.Dispose() }
+            }
+            $stream = [System.IO.File]::Create($target)
+            $writer = New-Object System.IO.BinaryWriter($stream)
+            try {
+              $writer.Write([UInt16]0)
+              $writer.Write([UInt16]1)
+              $writer.Write([UInt16]$images.Count)
+              $offset = 6 + (16 * $images.Count)
+              foreach ($item in $images) {
+                $dimension = if ($item.Size -eq 256) { [byte]0 } else { [byte]$item.Size }
+                $writer.Write($dimension)
+                $writer.Write($dimension)
+                $writer.Write([byte]0)
+                $writer.Write([byte]0)
+                $writer.Write([UInt16]1)
+                $writer.Write([UInt16]32)
+                $writer.Write([UInt32]$item.Bytes.Length)
+                $writer.Write([UInt32]$offset)
+                $offset += $item.Bytes.Length
+              }
+              foreach ($item in $images) { $writer.Write([byte[]]$item.Bytes) }
+            } finally { $writer.Dispose(); $stream.Dispose() }
+          } finally { $original.Dispose() }
+          if (!(Test-Path $target) -or (Get-Item $target).Length -lt 1000) { throw 'Windows icon generation failed.' }
+          Write-Host "Created $target with sizes: 16, 24, 32, 48, 64, 128, 256 pixels."
       - name: Install .NET 8 SDK
         uses: actions/setup-dotnet@v4
         with:
