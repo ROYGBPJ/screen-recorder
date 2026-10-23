@@ -541,7 +541,7 @@ public partial class MainWindow : Window
         ScheduleCheckBox.IsEnabled = ScheduleDatePicker.IsEnabled = ScheduleTimeBox.IsEnabled = CountdownSecondsBox.IsEnabled = enabled;
     }
 
-    private void Window_KeyDown(object sender, KeyEventArgs e)
+    private void Window_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (((Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) != (ModifierKeys.Control | ModifierKeys.Shift))) return;
         if (e.Key == Key.R) { if (_ffmpeg is { HasExited: false }) _ = StopRecordingAsync(); else _ = StartRecordingAsync(); e.Handled = true; }
