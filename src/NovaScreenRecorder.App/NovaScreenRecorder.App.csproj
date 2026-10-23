@@ -18,7 +18,7 @@
   </PropertyGroup>
   <ItemGroup>
     <None Update="NovaScreenRecorder-Icon.jpg" CopyToOutputDirectory="PreserveNewest" />
-  </PropertyGroup>
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.4.0" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
