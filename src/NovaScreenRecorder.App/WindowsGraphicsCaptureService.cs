@@ -1,5 +1,6 @@
 using Microsoft.Graphics.Canvas;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using Windows.Foundation;
 using Windows.Graphics;
