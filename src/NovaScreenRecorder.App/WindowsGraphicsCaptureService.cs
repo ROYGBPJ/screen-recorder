@@ -120,7 +120,7 @@ internal sealed class WindowsGraphicsCaptureService : IDisposable
                 using var resized = new CanvasRenderTarget(_device, _targetSize.Width, _targetSize.Height, 96, DirectXPixelFormat.B8G8R8A8UIntNormalized, CanvasAlphaMode.Premultiplied);
                 using (var drawing = resized.CreateDrawingSession())
                 {
-                    drawing.Clear(Windows.UI.Colors.Black);
+                    drawing.Clear(Windows.UI.Color.FromArgb(255, 0, 0, 0));
                     drawing.DrawImage(bitmap, new Windows.Foundation.Rect(0, 0, _targetSize.Width, _targetSize.Height));
                 }
                 pixels = resized.GetPixelBytes();
