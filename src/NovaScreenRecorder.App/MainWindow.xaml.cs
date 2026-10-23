@@ -702,17 +702,10 @@ public partial class MainWindow : Window
                 try { using var proc = Process.GetProcessById(marker.ProcessId); ffmpegStillRunning = !proc.HasExited && proc.ProcessName.Contains("ffmpeg", StringComparison.OrdinalIgnoreCase); } catch { }
                 if (ffmpegStillRunning)
                 {
-                    MessageBox.Show(this, $"An earlier FFmpeg process (PID {marker.ProcessId}) may still be recording:
-{marker.OutputPath}
-
-Stop that process before attempting recovery.", "Nova recovery", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(this, $"An earlier FFmpeg process (PID {marker.ProcessId}) may still be recording:\n{marker.OutputPath}\n\nStop that process before attempting recovery.", "Nova recovery", MessageBoxButton.OK, MessageBoxImage.Warning);
                     continue;
                 }
-                if (MessageBox.Show(this, $"Nova found a recording that may not have been finalized:
-
-{marker.OutputPath}
-
-Attempt to recover readable frames into a new MKV file? The original will be preserved.", "Recover interrupted recording", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) continue;
+                if (MessageBox.Show(this, $"Nova found a recording that may not have been finalized:\n\n{marker.OutputPath}\n\nAttempt to recover readable frames into a new MKV file? The original will be preserved.", "Recover interrupted recording", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) continue;
                 _ = RecoverOneAsync(markerPath, marker);
             }
         }
