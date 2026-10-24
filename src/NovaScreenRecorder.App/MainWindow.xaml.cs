@@ -536,7 +536,7 @@ public partial class MainWindow : Window
         catch (Exception ex) { ErrorLogService.WriteException("List audio devices", ex); ShowError($"Could not list audio devices: {ex.Message}"); }
     }
 
-    private static void PopulateAudioDeviceCombo(ComboBox combo, IReadOnlyCollection<string> devices, string currentText)
+    private static void PopulateAudioDeviceCombo(System.Windows.Controls.ComboBox combo, IReadOnlyCollection<string> devices, string currentText)
     {
         string previousSelection = currentText.Trim().Trim('"');
         combo.Items.Clear();
