@@ -419,26 +419,27 @@ public partial class MainWindow : Window
 
     private async void PauseButton_Click(object sender, RoutedEventArgs e) => await TogglePauseAsync();
 
-    private Task TogglePauseAsync()
+    private async Task TogglePauseAsync()
     {
-        if (_ffmpeg is not { HasExited: false }) return Task.CompletedTask;
+        if (_ffmpeg is not { HasExited: false }) return;
         try
         {
             int status = _isPaused ? NtResumeProcess(_ffmpeg.Handle) : NtSuspendProcess(_ffmpeg.Handle);
             if (status != 0) { MessageText.Text = $"Windows process pause/resume returned status 0x{status:X8}."; return Task.CompletedTask; }
             if (_isPaused)
             {
+                if (_desktopAudioRecorder is not null) await _desktopAudioRecorder.ResumeAsync();
                 _recordingStarted = DateTime.Now - _pausedElapsed; _isPaused = false; _timer.Start();
                 StatusText.Text = "RECORDING"; StatusText.Foreground = System.Windows.Media.Brushes.OrangeRed; PauseButton.Content = "Ⅱ  Pause"; MessageText.Text = "Recording resumed.";
             }
             else
             {
                 _pausedElapsed = DateTime.Now - _recordingStarted; _isPaused = true; _timer.Stop();
+                if (_desktopAudioRecorder is not null) await _desktopAudioRecorder.PauseAsync();
                 StatusText.Text = "PAUSED"; StatusText.Foreground = System.Windows.Media.Brushes.Gold; PauseButton.Content = "▶  Resume"; MessageText.Text = "Recording process paused. Stop to finalize the file.";
             }
         }
         catch (Exception ex) { ErrorLogService.WriteException("Pause/resume", ex); MessageText.Text = $"Pause/resume failed: {ex.Message}"; }
-        return Task.CompletedTask;
     }
 
     private async void StopButton_Click(object sender, RoutedEventArgs e) => await StopRecordingAsync();
