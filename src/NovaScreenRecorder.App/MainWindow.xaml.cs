@@ -9,6 +9,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using System.Windows.Interop;
 using System.Text.Json;
+using System.Text;
 using System.Drawing;
 using Windows.Graphics.Capture;
 
@@ -333,12 +334,16 @@ public partial class MainWindow : Window
             _lastFfmpegInputFailure = false;
             var startInfo = CreateProcessStartInfo(args, redirectInput: true, redirectOutput: true, redirectError: true);
             _ffmpeg = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
+            var ffmpegDiagnostic = new StringBuilder();
+            var ffmpegDiagnosticGate = new object();
+            var ffmpegStderrClosed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             _isStopping = false;
             _recordingReady = false;
             _stopWarning = null;
             _ffmpeg.ErrorDataReceived += (_, ev) =>
             {
-                if (ev.Data is null) return;
+                if (ev.Data is null) { ffmpegStderrClosed.TrySetResult(true); return; }
+                lock (ffmpegDiagnosticGate) ffmpegDiagnostic.AppendLine(ev.Data);
                 if (ev.Data.Contains("Error opening input", StringComparison.OrdinalIgnoreCase) ||
                     ev.Data.Contains("Could not open input", StringComparison.OrdinalIgnoreCase) ||
                     ev.Data.Contains("Could not find audio device", StringComparison.OrdinalIgnoreCase) ||
@@ -363,6 +368,14 @@ public partial class MainWindow : Window
             if (_ffmpeg.HasExited)
             {
                 var failedEncoder = _activeEncoder;
+                // Let the redirected stderr reader drain so the Error log contains FFmpeg's
+                // actual reason for exiting, not just the generic startup-failure message.
+                await Task.WhenAny(ffmpegStderrClosed.Task, Task.Delay(500));
+                string ffmpegErrorText;
+                lock (ffmpegDiagnosticGate) ffmpegErrorText = ffmpegDiagnostic.ToString();
+                int ffmpegExitCode = _ffmpeg.ExitCode;
+                ErrorLogService.Write("FFMPEG START FAILURE",
+                    $"Exit code: {ffmpegExitCode}{Environment.NewLine}Encoder: {failedEncoder}{Environment.NewLine}Output file: {_currentOutput ?? "(not set)"}{Environment.NewLine}Arguments: {string.Join(" ", args)}{Environment.NewLine}FFmpeg stderr:{Environment.NewLine}{(string.IsNullOrWhiteSpace(ffmpegErrorText) ? "(FFmpeg produced no stderr text.)" : ffmpegErrorText)}");
                 _ffmpeg.Dispose(); _ffmpeg = null;
                 if (_isWgcRecording) { try { await _wgc.StopAsync(); } catch { } }
                 if (_recoveryMarker is not null) { try { File.Delete(_recoveryMarker); } catch { } _recoveryMarker = null; }
