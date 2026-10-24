@@ -517,35 +517,53 @@ public partial class MainWindow : Window
             string output = await p.StandardError.ReadToEndAsync(); await p.WaitForExitAsync();
             string path = Path.Combine(_outputFolder, "Nova-Audio-Devices.txt"); File.WriteAllText(path, output);
 
-            // Populate the microphone dropdown from FFmpeg's DirectShow device list.
-            var microphones = System.Text.RegularExpressions.Regex.Matches(
+            // Populate both audio-device dropdowns from FFmpeg's DirectShow audio device list.
+            var audioDevices = System.Text.RegularExpressions.Regex.Matches(
                 output, "\\\"([^\\\"\\r\\n]+)\\\"\\s*\\(audio\\)", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
                 .Select(m => m.Groups[1].Value.Trim())
                 .Where(name => !string.IsNullOrWhiteSpace(name))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
-            string previousSelection = MicDeviceBox.Text.Trim().Trim('"');
-            MicDeviceBox.Items.Clear();
-            foreach (var microphone in microphones) MicDeviceBox.Items.Add(microphone);
-            if (!string.IsNullOrWhiteSpace(previousSelection))
-            {
-                var matching = microphones.FirstOrDefault(name => name.Equals(previousSelection, StringComparison.OrdinalIgnoreCase));
-                MicDeviceBox.Text = matching ?? previousSelection;
-            }
-            else if (microphones.Count > 0)
-            {
-                MicDeviceBox.SelectedIndex = 0;
-            }
+
+            PopulateAudioDeviceCombo(MicDeviceBox, audioDevices, MicDeviceBox.Text);
+            PopulateAudioDeviceCombo(DesktopAudioDeviceBox, audioDevices, DesktopAudioDeviceBox.Text);
             SaveSettings();
-            MessageText.Text = microphones.Count > 0
-                ? $"Found {microphones.Count} microphone/audio devices. Choose your microphone from the dropdown; your selection is saved automatically."
+            MessageText.Text = audioDevices.Count > 0
+                ? $"Found {audioDevices.Count} DirectShow audio devices. Choose your microphone and desktop-audio device from their dropdowns; selections are saved automatically."
                 : $"No DirectShow audio devices were detected. Check the device list saved to {path}.";
             Process.Start(new ProcessStartInfo("notepad.exe", path) { UseShellExecute = true });
         }
         catch (Exception ex) { ErrorLogService.WriteException("List audio devices", ex); ShowError($"Could not list audio devices: {ex.Message}"); }
     }
 
+    private static void PopulateAudioDeviceCombo(ComboBox combo, IReadOnlyCollection<string> devices, string currentText)
+    {
+        string previousSelection = currentText.Trim().Trim('"');
+        combo.Items.Clear();
+        foreach (var device in devices) combo.Items.Add(device);
+
+        if (!string.IsNullOrWhiteSpace(previousSelection))
+        {
+            var matching = devices.FirstOrDefault(name => name.Equals(previousSelection, StringComparison.OrdinalIgnoreCase));
+            combo.Text = matching ?? previousSelection;
+        }
+        else if (devices.Count > 0)
+        {
+            combo.SelectedIndex = 0;
+        }
+    }
+
     private void MicDeviceBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (IsLoaded) SaveSettings();
+    }
+
+    private void DesktopAudioDeviceBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (IsLoaded) SaveSettings();
+    }
+
+    private void DesktopAudioDeviceBox_LostFocus(object sender, RoutedEventArgs e)
     {
         if (IsLoaded) SaveSettings();
     }
