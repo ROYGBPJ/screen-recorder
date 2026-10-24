@@ -412,7 +412,11 @@ public partial class MainWindow : Window
             }
             if (desktopAudio)
             {
-                _desktopAudioWav = Path.Combine(_outputFolder, $"{Path.GetFileNameWithoutExtension(_currentOutput)}.desktop-audio.wav");
+                // Keep the temporary loopback WAV out of the recordings folder. It is an
+                // intermediate track only; the finished recording should contain the audio.
+                var audioTempFolder = Path.Combine(Path.GetTempPath(), "NovaScreenRecorder", "Audio");
+                Directory.CreateDirectory(audioTempFolder);
+                _desktopAudioWav = Path.Combine(audioTempFolder, $"{Guid.NewGuid():N}.desktop-audio.wav");
                 try
                 {
                     _desktopAudioRecorder = new WasapiLoopbackRecorder(_desktopAudioWav);
@@ -517,8 +521,11 @@ public partial class MainWindow : Window
                 }
                 else
                 {
-                    _stopWarning = $"The video was saved, but desktop audio could not be added. The separate audio file was preserved at: {_desktopAudioWav}";
+                    _stopWarning = "The video was saved, but desktop audio could not be added. The original video was kept; see the Error folder for FFmpeg details.";
                 }
+                // This WAV is an internal temporary track, not a separate user recording.
+                try { if (File.Exists(_desktopAudioWav)) File.Delete(_desktopAudioWav); }
+                catch (Exception ex) { ErrorLogService.WriteException("Clean up temporary desktop audio", ex, _desktopAudioWav); }
             }
             finalizedCleanly = process.HasExited && process.ExitCode == 0 &&
                 !string.IsNullOrWhiteSpace(_currentOutput) && File.Exists(_currentOutput) &&
@@ -557,14 +564,21 @@ public partial class MainWindow : Window
         try
         {
             if (File.Exists(muxedPath)) File.Delete(muxedPath);
+
+            // The microphone is recorded directly into the video by FFmpeg. Only mix it
+            // with loopback audio when the finalized video really contains an audio stream.
+            // A checked microphone box alone is not proof that DirectShow opened it.
+            bool videoHasMicrophoneAudio = mixMicrophone && await HasAudioStreamAsync(videoPath);
             var args = new List<string> { "-hide_banner", "-y", "-i", videoPath, "-i", audioPath };
-            if (mixMicrophone)
+            if (videoHasMicrophoneAudio)
             {
                 args.AddRange(new[] { "-filter_complex", "[0:a:0][1:a:0]amix=inputs=2:duration=longest:dropout_transition=2[aout]",
                     "-map", "0:v:0", "-map", "[aout]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k" });
             }
             else
             {
+                // If microphone capture did not start, include desktop audio by itself
+                // instead of referencing a nonexistent [0:a:0] stream and failing the mux.
                 args.AddRange(new[] { "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k" });
             }
             args.Add("-shortest");
@@ -581,7 +595,7 @@ public partial class MainWindow : Window
             var stderr = await stderrTask;
             if (muxer.ExitCode != 0 || !File.Exists(muxedPath) || new FileInfo(muxedPath).Length < 4096)
             {
-                ErrorLogService.Write("ERROR", $"Could not mux WASAPI desktop audio. Exit code={muxer.ExitCode}; video={videoPath}; audio={audioPath}; FFmpeg output={stderr}{Environment.NewLine}{stdout}");
+                ErrorLogService.Write("ERROR", $"Could not mux WASAPI desktop audio. Exit code={muxer.ExitCode}; microphone audio detected={videoHasMicrophoneAudio}; video={videoPath}; audio={audioPath}; FFmpeg output={stderr}{Environment.NewLine}{stdout}");
                 try { if (File.Exists(muxedPath)) File.Delete(muxedPath); } catch { }
                 return false;
             }
@@ -593,6 +607,31 @@ public partial class MainWindow : Window
         {
             ErrorLogService.WriteException("Mux WASAPI desktop audio", ex, $"Video={videoPath}; audio={audioPath}");
             try { if (File.Exists(muxedPath)) File.Delete(muxedPath); } catch { }
+            return false;
+        }
+    }
+
+    private async Task<bool> HasAudioStreamAsync(string videoPath)
+    {
+        try
+        {
+            // FFmpeg prints stream metadata to stderr even when it exits with an error
+            // because no output was supplied. Inspect the metadata rather than assuming
+            // that a selected microphone was successfully recorded.
+            var args = new[] { "-hide_banner", "-i", videoPath };
+            using var probe = Process.Start(CreateProcessStartInfo(args, false, true, true))
+                ?? throw new InvalidOperationException("Could not inspect the finalized recording's audio streams.");
+            var stdoutTask = probe.StandardOutput.ReadToEndAsync();
+            var stderrTask = probe.StandardError.ReadToEndAsync();
+            await probe.WaitForExitAsync();
+            var output = (await stderrTask) + Environment.NewLine + (await stdoutTask);
+            return System.Text.RegularExpressions.Regex.IsMatch(output,
+                @"Stream #\\d+:\\d+(?:\\([^)]*\\))?: Audio:",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        }
+        catch (Exception ex)
+        {
+            ErrorLogService.WriteException("Detect microphone audio stream before mux", ex, videoPath);
             return false;
         }
     }
