@@ -1,5 +1,5 @@
 #define AppName "Nova Screen Recorder"
-#define AppVersion "1.0.0"
+#define AppVersion "5.5.9"
 #define AppPublisher "Nova Screen Recorder"
 #define AppExeName "NovaScreenRecorder.App.exe"
 
