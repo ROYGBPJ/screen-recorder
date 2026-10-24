@@ -626,7 +626,7 @@ public partial class MainWindow : Window
             await probe.WaitForExitAsync();
             var output = (await stderrTask) + Environment.NewLine + (await stdoutTask);
             return System.Text.RegularExpressions.Regex.IsMatch(output,
-                @"Stream #\\d+:\\d+(?:\\([^)]*\\))?: Audio:",
+                @"Stream #\d+:\d+(?:\([^)]*\))?: Audio:",
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         }
         catch (Exception ex)
