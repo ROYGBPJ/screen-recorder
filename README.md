@@ -10,7 +10,7 @@ Nova Screen Recorder is a Windows 11 x64 desktop recording application built wit
 - FFmpeg encoder discovery for NVIDIA NVENC, Intel Quick Sync, AMD AMF, Windows Media Foundation H.264, and `libx264` when present, with an encoder retry chain and built-in MPEG-4 fallback for LGPL builds that lack an H.264 encoder.
 - Optional DirectShow microphone recording, with a helper to list DirectShow devices.
 - Optional DirectShow webcam picture-in-picture overlay positioned in the lower-right corner; size/position is currently fixed.
-- Optional WASAPI desktop audio; microphone + desktop audio can be mixed into one AAC output track when the selected FFmpeg build and devices support both.
+- Optional desktop audio through a DirectShow capture source such as Windows Stereo Mix or a compatible virtual audio cable; microphone + desktop audio can be mixed into one AAC output track. This is not native WASAPI loopback capture, so a playback-only endpoint such as some Voicemod devices may fail to open.
 - Pause/resume by suspending and resuming the FFmpeg process. This is not equivalent to a native capture-engine pause and should be tested with the chosen container/codec.
 - PNG screenshots through native Windows Graphics Capture when that backend is selected, or through FFmpeg GDI compatibility capture.
 - Choose/open output folder, elapsed timer, saved settings, FFmpeg path check, error messaging, and global Ctrl+Shift+R/P/S shortcuts (subject to system-wide shortcut conflicts).
@@ -92,7 +92,7 @@ The Nova application source is licensed under MIT. FFmpeg is a separate third-pa
 ## Expanded workflow and reliability features
 
 - **Global shortcuts:** `Ctrl+Shift+R` toggles start/stop, `Ctrl+Shift+P` pauses/resumes, and `Ctrl+Shift+S` requests a screenshot. Windows may reject a shortcut if another application already registered it; Nova writes a diagnostic warning and retains focused-window shortcuts.
-- **Mixed audio:** microphone and desktop loopback can be enabled together. FFmpeg mixes both tracks into a single AAC stream; actual device names and WASAPI support depend on the local Windows/FFmpeg setup.
+- **Mixed audio:** microphone and desktop audio can be enabled together. FFmpeg mixes both tracks into a single AAC stream. Desktop audio currently uses a DirectShow capture device (for example Stereo Mix or a compatible virtual audio cable), not native WASAPI loopback. A playback-only endpoint may appear in device lists but still fail to open as a capture input.
 - **Native WGC:** the system picker selects a display/window and WGC frame-pool frames are piped to FFmpeg as BGRA raw video. This has not yet been benchmarked across real GPUs or HDR setups.
 - **Monitor/region selection:** compatibility capture enumerates monitors and the visual region overlay returns virtual-desktop physical coordinates, including negative origins.
 - **Hardware encoding:** FFmpeg encoder discovery supports automatic NVENC/QSV/AMF preference and CPU fallback; actual GPU driver compatibility must be tested locally.
