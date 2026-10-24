@@ -76,7 +76,15 @@ public partial class MainWindow : Window
             else MessageText.Text = $"Scheduled recording in {(int)remaining.TotalHours:00}:{remaining.Minutes:00}:{remaining.Seconds:00}.";
         };
         _wgc.CaptureError += ex => { ErrorLogService.WriteException("Windows Graphics Capture frame stream", ex); Dispatcher.BeginInvoke(new Action(() => MessageText.Text = $"Native capture warning: {ex.Message}")); };
-        Loaded += (_, _) => { LoadSettings(); RefreshMonitors(); RefreshRecordingsLibrary(); RecoverPendingRecordings(); };
+        Loaded += async (_, _) =>
+        {
+            LoadSettings();
+            RefreshMonitors();
+            RefreshRecordingsLibrary();
+            RecoverPendingRecordings();
+            // Populate the device dropdowns automatically on each launch.
+            await LoadDirectShowDevicesAsync(showMessage: false);
+        };
         SourceInitialized += (_, _) => RegisterGlobalHotkeys();
         Closing += async (_, e) =>
         {
@@ -729,23 +737,39 @@ public partial class MainWindow : Window
 
     private async void ListDevicesButton_Click(object sender, RoutedEventArgs e)
     {
+        await LoadDirectShowDevicesAsync(showMessage: true);
+    }
+
+    private async Task LoadDirectShowDevicesAsync(bool showMessage)
+    {
         if (!EnsureFfmpeg()) return;
         try
         {
-            using var p = Process.Start(new ProcessStartInfo { FileName = FfmpegPath, Arguments = "-hide_banner -list_devices true -f dshow -i dummy", UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true });
+            using var p = Process.Start(new ProcessStartInfo
+            {
+                FileName = FfmpegPath,
+                Arguments = "-hide_banner -list_devices true -f dshow -i dummy",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true
+            });
             if (p is null) throw new InvalidOperationException("FFmpeg could not be launched.");
-            string output = await p.StandardError.ReadToEndAsync(); await p.WaitForExitAsync();
-            string path = Path.Combine(_outputFolder, "Nova-Audio-Devices.txt"); File.WriteAllText(path, output);
+            string output = await p.StandardError.ReadToEndAsync();
+            await p.WaitForExitAsync();
+            Directory.CreateDirectory(_outputFolder);
+            File.WriteAllText(Path.Combine(_outputFolder, "Nova-Audio-Devices.txt"), output);
 
-            // Populate audio and webcam dropdowns from FFmpeg's DirectShow device list.
             var audioDevices = System.Text.RegularExpressions.Regex.Matches(
-                output, "\\\"([^\\\"\\r\\n]+)\\\"\\s*\\(audio\\)", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+                output, "\\\"([^\\\"\\r\\n]+)\\\"\\s*\\(audio\\)",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase)
                 .Select(m => m.Groups[1].Value.Trim())
                 .Where(name => !string.IsNullOrWhiteSpace(name))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
             var videoDevices = System.Text.RegularExpressions.Regex.Matches(
-                output, "\\\"([^\\\"\\r\\n]+)\\\"\\s*\\(video\\)", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+                output, "\\\"([^\\\"\\r\\n]+)\\\"\\s*\\(video\\)",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase)
                 .Select(m => m.Groups[1].Value.Trim())
                 .Where(name => !string.IsNullOrWhiteSpace(name))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -755,18 +779,18 @@ public partial class MainWindow : Window
             PopulateAudioDeviceCombo(DesktopAudioDeviceBox, audioDevices, DesktopAudioDeviceBox.Text);
             PopulateAudioDeviceCombo(WebcamDeviceBox, videoDevices, WebcamDeviceBox.Text);
             SaveSettings();
-            MessageText.Text = $"Found {audioDevices.Count} DirectShow audio device(s) and {videoDevices.Count} webcam/video device(s). Choose devices from their dropdowns; selections are saved automatically.";
-            Process.Start(new ProcessStartInfo("notepad.exe", path) { UseShellExecute = true });
-        }
-        catch (Exception ex) { ErrorLogService.WriteException("List audio devices", ex); ShowError($"Could not list audio devices: {ex.Message}"); }
-    }
 
-    private static string BuildDirectShowInput(string mediaType, string deviceName)
-    {
-        // ArgumentList already keeps this entire value in one argument. Do not embed
-        // shell-style quotes: FFmpeg treats them as literal device-name characters.
-        string name = deviceName.Trim().Trim('"');
-        return mediaType + "=" + name;
+            if (showMessage)
+                MessageText.Text = $"Found {audioDevices.Count} DirectShow audio device(s) and {videoDevices.Count} webcam/video device(s). Device selectors updated.";
+        }
+        catch (Exception ex)
+        {
+            ErrorLogService.WriteException("Load DirectShow devices", ex);
+            if (showMessage)
+                ShowError($"Could not list devices: {ex.Message}");
+            else
+                MessageText.Text = $"Devices could not load automatically: {ex.Message}. You can retry with List DirectShow devices.";
+        }
     }
 
     private static void PopulateAudioDeviceCombo(System.Windows.Controls.ComboBox combo, IReadOnlyCollection<string> devices, string currentText)
