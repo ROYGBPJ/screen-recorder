@@ -319,13 +319,29 @@ public partial class MainWindow : Window
             outputMaps.AddRange(new[] { "-map", "[vout]" });
         }
         else outputMaps.AddRange(new[] { "-map", "0:v:0" });
+        // Apply independent per-source gain/mute before mixing. Keeping these
+        // controls upstream of amix prevents one source's fader from changing the other.
+        bool micMuted = MicMuteCheckBox.IsChecked == true;
+        bool desktopMuted = DesktopMuteCheckBox.IsChecked == true;
+        double micGainDb = MicGainSlider.Value;
+        double desktopGainDb = DesktopGainSlider.Value;
+        string micGain = micMuted ? "0" : Math.Pow(10d, micGainDb / 20d).ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
+        string desktopGain = desktopMuted ? "0" : Math.Pow(10d, desktopGainDb / 20d).ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
         if (mic && desktopAudio)
         {
-            filterParts.Add($"[{micInput}:a:0][{desktopInput}:a:0]amix=inputs=2:duration=longest:dropout_transition=2[aout]");
+            filterParts.Add($"[{micInput}:a:0]volume={micGain}:eval=frame[micadjusted];[{desktopInput}:a:0]volume={desktopGain}:eval=frame[desktopadjusted];[micadjusted][desktopadjusted]amix=inputs=2:duration=longest:dropout_transition=2:normalize=0[aout]");
             outputMaps.AddRange(new[] { "-map", "[aout]" });
         }
-        else if (mic) outputMaps.AddRange(new[] { "-map", $"{micInput}:a:0" });
-        else if (desktopAudio) outputMaps.AddRange(new[] { "-map", $"{desktopInput}:a:0" });
+        else if (mic)
+        {
+            filterParts.Add($"[{micInput}:a:0]volume={micGain}:eval=frame[micadjusted]");
+            outputMaps.AddRange(new[] { "-map", "[micadjusted]" });
+        }
+        else if (desktopAudio)
+        {
+            filterParts.Add($"[{desktopInput}:a:0]volume={desktopGain}:eval=frame[desktopadjusted]");
+            outputMaps.AddRange(new[] { "-map", "[desktopadjusted]" });
+        }
         else outputMaps.Add("-an");
         if (filterParts.Count > 0) args.AddRange(new[] { "-filter_complex", string.Join(";", filterParts) });
         args.AddRange(outputMaps);
