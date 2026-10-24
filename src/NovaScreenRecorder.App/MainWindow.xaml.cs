@@ -462,7 +462,7 @@ public partial class MainWindow : Window
         try
         {
             int status = _isPaused ? NtResumeProcess(_ffmpeg.Handle) : NtSuspendProcess(_ffmpeg.Handle);
-            if (status != 0) { MessageText.Text = $"Windows process pause/resume returned status 0x{status:X8}."; return Task.CompletedTask; }
+            if (status != 0) { MessageText.Text = $"Windows process pause/resume returned status 0x{status:X8}."; return; }
             if (_isPaused)
             {
                 if (_desktopAudioRecorder is not null) await _desktopAudioRecorder.ResumeAsync();
