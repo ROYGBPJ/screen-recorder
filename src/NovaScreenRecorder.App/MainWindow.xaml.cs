@@ -198,10 +198,27 @@ public partial class MainWindow : Window
             }
         }
         if (!EnsureFfmpeg()) return;
-        if (CaptureBackendCombo.SelectedIndex == 0 && _wgc.SelectedItem is null)
-        { ShowError("Choose a display or window using the native Windows Graphics Capture picker first."); return; }
         if (CaptureBackendCombo.SelectedIndex == 0 && !WindowsGraphicsCaptureService.IsSupported)
         { ShowError("Windows Graphics Capture is not supported on this Windows build. Choose FFmpeg GDI compatibility capture instead."); return; }
+        if (CaptureBackendCombo.SelectedIndex == 0 && _wgc.SelectedItem is null)
+        {
+            // Open the native picker automatically if Start is pressed before choosing a target.
+            try
+            {
+                var picked = await _wgc.PickItemAsync(new WindowInteropHelper(this).Handle);
+                SelectedCaptureText.Text = picked && _wgc.SelectedItem is not null
+                    ? $"Native capture target selected • {_wgc.SelectedItem.Size.Width} × {_wgc.SelectedItem.Size.Height}"
+                    : "Native capture target: selection cancelled";
+                if (!picked || _wgc.SelectedItem is null)
+                { ShowError("Select a display or window in the Windows capture picker to start recording."); return; }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogService.WriteException("Open native capture picker at recording start", ex);
+                ShowError($"Could not open the Windows capture picker: {ex.Message}");
+                return;
+            }
+        }
         await DetectEncodersAsync();
         if (MicCheckBox.IsChecked == true && string.IsNullOrWhiteSpace(MicDeviceBox.Text.Trim().Trim('"')))
         {
