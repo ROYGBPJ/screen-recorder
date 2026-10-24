@@ -488,11 +488,23 @@ public partial class MainWindow : Window
             }
             if (!process.HasExited)
             {
+                // For FFmpeg capture, "q" requests a clean muxer shutdown. For native
+                // Windows Graphics Capture, stdin carries raw video frames, so StopAsync
+                // must finish the frame pump and close that pipe instead of sending "q".
                 if (!_isWgcRecording) await process.StandardInput.WriteLineAsync("q");
                 try { process.StandardInput.Close(); } catch { }
-                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(12));
+                // MP4 finalization can take longer for high-resolution/high-FPS or
+                // software-encoded recordings. A short timeout kills FFmpeg mid-mux and
+                // leaves an MP4 without its final metadata, so allow a generous drain.
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
                 try { await process.WaitForExitAsync(timeout.Token); }
-                catch (OperationCanceledException) { process.Kill(true); await process.WaitForExitAsync(); _stopWarning = "FFmpeg required a forced stop; the recovery marker was retained."; }
+                catch (OperationCanceledException)
+                {
+                    ErrorLogService.Write("ERROR", $"FFmpeg did not exit within 60 seconds after a graceful stop request. The process will be terminated and the recovery marker retained. Output={_currentOutput}");
+                    process.Kill(true);
+                    await process.WaitForExitAsync();
+                    _stopWarning = "FFmpeg did not finish finalizing within 60 seconds and was force-stopped; the recovery marker was retained.";
+                }
             }
             finalizedCleanly = process.HasExited && process.ExitCode == 0 &&
                 !string.IsNullOrWhiteSpace(_currentOutput) && File.Exists(_currentOutput) &&
