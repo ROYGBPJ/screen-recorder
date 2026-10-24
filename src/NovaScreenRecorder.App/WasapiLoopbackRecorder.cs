@@ -71,6 +71,24 @@ internal sealed class WasapiLoopbackRecorder : IDisposable
         _stopped?.TrySetResult(true);
     }
 
+    public async Task PauseAsync()
+    {
+        if (_capture is null || !_started) return;
+        _capture.StopRecording();
+        if (_stopped is not null)
+            await _stopped.Task.WaitAsync(TimeSpan.FromSeconds(8));
+        _started = false;
+        _stopped = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    public Task ResumeAsync()
+    {
+        if (_capture is null || _started) return Task.CompletedTask;
+        _capture.StartRecording();
+        _started = true;
+        return Task.CompletedTask;
+    }
+
     public async Task StopAsync()
     {
         if (_capture is null) return;
