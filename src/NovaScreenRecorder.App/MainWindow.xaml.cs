@@ -389,16 +389,18 @@ public partial class MainWindow : Window
                     if (microphoneFailed)
                     {
                         MicCheckBox.IsChecked = false;
-                        _stopWarning = "The selected microphone could not be opened. Nova is retrying without microphone input; desktop loopback audio can still be recorded.";
-                        MessageText.Text = _stopWarning;
-                        await StartRecordingAsync(true, true); return;
+                        var fallbackWarning = "The selected microphone could not be opened. Nova is retrying without microphone input; desktop loopback audio can still be recorded.";
+                        await StartRecordingAsync(true, true);
+                        if (_recordingReady) { _stopWarning = fallbackWarning; MessageText.Text += Environment.NewLine + fallbackWarning; }
+                        return;
                     }
                     if (webcamFailed)
                     {
                         WebcamCheckBox.IsChecked = false;
-                        _stopWarning = "The selected webcam could not be opened. Nova is retrying without the webcam overlay.";
-                        MessageText.Text = _stopWarning;
-                        await StartRecordingAsync(true, true); return;
+                        var fallbackWarning = "The selected webcam could not be opened. Nova is retrying without the webcam overlay.";
+                        await StartRecordingAsync(true, true);
+                        if (_recordingReady) { _stopWarning = fallbackWarning; MessageText.Text += Environment.NewLine + fallbackWarning; }
+                        return;
                     }
                 }
                 if (!_lastFfmpegInputFailure && _automaticEncoder && failedEncoder != "mpeg4" && _failedEncoders.Add(failedEncoder))
