@@ -274,10 +274,10 @@ public partial class MainWindow : Window
         // ProcessStartInfo.ArgumentList already preserves each argument as one token.
         // Do not include shell-style quotes inside DirectShow input values: FFmpeg then
         // treats the quote characters as part of the device name and cannot open it.
-        if (webcam) { webcamInput = nextInput++; args.AddRange(new[] { "-f", "dshow", "-i", $"video={WebcamDeviceBox.Text.Trim().Trim('"')}" }); }
+        if (webcam) { webcamInput = nextInput++; args.AddRange(new[] { "-f", "dshow", "-i", BuildDirectShowInput("video", WebcamDeviceBox.Text) }); }
         int? micInput = null, desktopInput = null;
-        if (mic) { micInput = nextInput++; args.AddRange(new[] { "-f", "dshow", "-i", $"audio={MicDeviceBox.Text.Trim().Trim('"')}" }); }
-        if (desktopAudio) { desktopInput = nextInput++; args.AddRange(new[] { "-f", "dshow", "-i", $"audio={DesktopAudioDeviceBox.Text.Trim().Trim('"')}" }); }
+        if (mic) { micInput = nextInput++; args.AddRange(new[] { "-f", "dshow", "-i", BuildDirectShowInput("audio", MicDeviceBox.Text) }); }
+        if (desktopAudio) { desktopInput = nextInput++; args.AddRange(new[] { "-f", "dshow", "-i", BuildDirectShowInput("audio", DesktopAudioDeviceBox.Text) }); }
         var filterParts = new List<string>();
         var outputMaps = new List<string>();
         if (webcam)
@@ -541,6 +541,13 @@ public partial class MainWindow : Window
         catch (Exception ex) { ErrorLogService.WriteException("List audio devices", ex); ShowError($"Could not list audio devices: {ex.Message}"); }
     }
 
+    private static string BuildDirectShowInput(string mediaType, string deviceName)
+    {
+        // Quotes must be part of the DirectShow input specification itself. ArgumentList
+        // protects the argument boundary but does not quote the device name for FFmpeg.
+        string name = deviceName.Trim().Trim('"').Replace("\\", "\\\\").Replace("\"", "\\\"");
+        return mediaType + "=\"" + name + "\"";
+    }
     private static void PopulateAudioDeviceCombo(System.Windows.Controls.ComboBox combo, IReadOnlyCollection<string> devices, string currentText)
     {
         string previousSelection = currentText.Trim().Trim('"');
