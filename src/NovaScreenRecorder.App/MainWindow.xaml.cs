@@ -516,10 +516,38 @@ public partial class MainWindow : Window
             if (p is null) throw new InvalidOperationException("FFmpeg could not be launched.");
             string output = await p.StandardError.ReadToEndAsync(); await p.WaitForExitAsync();
             string path = Path.Combine(_outputFolder, "Nova-Audio-Devices.txt"); File.WriteAllText(path, output);
-            MessageText.Text = $"Device list saved to {path}. Open it and copy the exact DirectShow audio/video device name into the matching field.";
+
+            // Populate the microphone dropdown from FFmpeg's DirectShow device list.
+            var microphones = System.Text.RegularExpressions.Regex.Matches(
+                output, "\\\"([^\\\"\\r\\n]+)\\\"\\s*\\(audio\\)", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+                .Select(m => m.Groups[1].Value.Trim())
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            string previousSelection = MicDeviceBox.Text.Trim().Trim('"');
+            MicDeviceBox.Items.Clear();
+            foreach (var microphone in microphones) MicDeviceBox.Items.Add(microphone);
+            if (!string.IsNullOrWhiteSpace(previousSelection))
+            {
+                var matching = microphones.FirstOrDefault(name => name.Equals(previousSelection, StringComparison.OrdinalIgnoreCase));
+                MicDeviceBox.Text = matching ?? previousSelection;
+            }
+            else if (microphones.Count > 0)
+            {
+                MicDeviceBox.SelectedIndex = 0;
+            }
+            SaveSettings();
+            MessageText.Text = microphones.Count > 0
+                ? $"Found {microphones.Count} microphone/audio devices. Choose your microphone from the dropdown; your selection is saved automatically."
+                : $"No DirectShow audio devices were detected. Check the device list saved to {path}.";
             Process.Start(new ProcessStartInfo("notepad.exe", path) { UseShellExecute = true });
         }
         catch (Exception ex) { ErrorLogService.WriteException("List audio devices", ex); ShowError($"Could not list audio devices: {ex.Message}"); }
+    }
+
+    private void MicDeviceBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (IsLoaded) SaveSettings();
     }
 
     private async void HandleUnexpectedExit()
