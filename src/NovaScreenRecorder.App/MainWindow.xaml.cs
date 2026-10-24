@@ -225,10 +225,9 @@ public partial class MainWindow : Window
         {
             ShowError("Enter the exact DirectShow microphone device name, or turn microphone recording off."); return;
         }
-        if (DesktopAudioCheckBox.IsChecked == true && string.IsNullOrWhiteSpace(DesktopAudioDeviceBox.Text.Trim().Trim('"')))
-        {
-            ShowError("Enter the exact DirectShow desktop-audio loopback device name (for example, Stereo Mix), or turn desktop audio off."); return;
-        }
+        // Desktop audio uses WASAPI loopback on the Windows default playback endpoint.
+        // It must not be opened as a DirectShow capture device: that fails for ordinary
+        // render endpoints and can make FFmpeg exit before the MP4 is finalized.
         if (CaptureBackendCombo.SelectedIndex != 0 && CaptureModeCombo.SelectedIndex == 2 && string.IsNullOrWhiteSpace(WindowTitleBox.Text))
         {
             ShowError("Enter the visible title of the window you want to record."); return;
@@ -295,7 +294,7 @@ public partial class MainWindow : Window
         if (webcam) { webcamInput = nextInput++; args.AddRange(new[] { "-f", "dshow", "-i", BuildDirectShowInput("video", WebcamDeviceBox.Text) }); }
         int? micInput = null, desktopInput = null;
         if (mic) { micInput = nextInput++; args.AddRange(new[] { "-f", "dshow", "-i", BuildDirectShowInput("audio", MicDeviceBox.Text) }); }
-        if (desktopAudio) { desktopInput = nextInput++; args.AddRange(new[] { "-f", "dshow", "-i", BuildDirectShowInput("audio", DesktopAudioDeviceBox.Text) }); }
+        if (desktopAudio) { desktopInput = nextInput++; args.AddRange(new[] { "-f", "wasapi", "-loopback", "1", "-i", "default" }); }
         var filterParts = new List<string>();
         var outputMaps = new List<string>();
         if (webcam)
@@ -379,6 +378,10 @@ public partial class MainWindow : Window
                 _ffmpeg.Dispose(); _ffmpeg = null;
                 if (_isWgcRecording) { try { await _wgc.StopAsync(); } catch { } }
                 if (_recoveryMarker is not null) { try { File.Delete(_recoveryMarker); } catch { } _recoveryMarker = null; }
+                // This file was created by this failed startup and never became a recording.
+                // Remove the broken container instead of leaving an MP4 that looks usable.
+                try { if (_currentOutput is not null && File.Exists(_currentOutput)) File.Delete(_currentOutput); }
+                catch (Exception ex) { ErrorLogService.WriteException("Remove failed startup output", ex, _currentOutput); }
                 if (!_lastFfmpegInputFailure && _automaticEncoder && failedEncoder != "mpeg4" && _failedEncoders.Add(failedEncoder))
                 {
                     MessageText.Text = $"Encoder {failedEncoder} failed to initialize; retrying with the next available encoder.";
@@ -402,6 +405,8 @@ public partial class MainWindow : Window
             if (_isWgcRecording) { try { await _wgc.StopAsync(); } catch { } }
             _isWgcRecording = false;
             if (_recoveryMarker is not null) { try { File.Delete(_recoveryMarker); } catch { } _recoveryMarker = null; }
+            try { if (_currentOutput is not null && File.Exists(_currentOutput)) File.Delete(_currentOutput); }
+            catch (Exception deleteEx) { ErrorLogService.WriteException("Remove failed startup output", deleteEx, _currentOutput); }
             ShowError($"Could not start FFmpeg: {ex.Message}. Check the Error folder, device names, and encoder support.");
         }
     }
@@ -453,7 +458,11 @@ public partial class MainWindow : Window
                 try { await process.WaitForExitAsync(timeout.Token); }
                 catch (OperationCanceledException) { process.Kill(true); await process.WaitForExitAsync(); _stopWarning = "FFmpeg required a forced stop; the recovery marker was retained."; }
             }
-            finalizedCleanly = process.HasExited && process.ExitCode == 0 && File.Exists(_currentOutput);
+            finalizedCleanly = process.HasExited && process.ExitCode == 0 &&
+                !string.IsNullOrWhiteSpace(_currentOutput) && File.Exists(_currentOutput) &&
+                await ValidateRecordingAsync(_currentOutput);
+            if (!finalizedCleanly && string.IsNullOrWhiteSpace(_stopWarning))
+                _stopWarning = "FFmpeg did not produce a verified playable recording. The recovery marker was retained if available.";
         }
         catch (Exception ex)
         {
@@ -468,12 +477,43 @@ public partial class MainWindow : Window
             else if (_recoveryMarker is not null && File.Exists(_recoveryMarker)) _stopWarning ??= "The recording may be incomplete; a recovery marker was kept for the next launch.";
             _recoveryMarker = null; StatusText.Text = "READY"; StatusText.Foreground = System.Windows.Media.Brushes.LightSkyBlue; ElapsedText.Text = "00:00:00";
             StartButton.IsEnabled = true; PauseButton.IsEnabled = false; StopButton.IsEnabled = false; ScreenshotButton.IsEnabled = true; ChooseFolderButton.IsEnabled = true; SetConfigurationEnabled(true);
-            MessageText.Text = File.Exists(_currentOutput)
-                ? $"Recording saved: {_currentOutput}" + (_stopWarning is null ? string.Empty : Environment.NewLine + _stopWarning)
-                : "Recording stopped. The output file may not have been finalized." + (_stopWarning is null ? string.Empty : Environment.NewLine + _stopWarning);
+            MessageText.Text = finalizedCleanly
+                ? $"Recording finalized and playback-verified: {_currentOutput}" + (_stopWarning is null ? string.Empty : Environment.NewLine + _stopWarning)
+                : $"Recording NOT verified; the file may be incomplete or unplayable: {_currentOutput}" + (_stopWarning is null ? string.Empty : Environment.NewLine + _stopWarning);
             _isStopping = false;
             RefreshRecordingsLibrary();
             if (AutoOpenCheckBox.IsChecked == true) OpenFolderButton_Click(this, new RoutedEventArgs());
+        }
+    }
+
+    private async Task<bool> ValidateRecordingAsync(string path)
+    {
+        try
+        {
+            if (!File.Exists(path) || new FileInfo(path).Length < 4096)
+            {
+                ErrorLogService.Write("ERROR", $"Recording validation failed: output is missing or unexpectedly small. File={path}");
+                return false;
+            }
+
+            var args = new[] { "-hide_banner", "-v", "error", "-xerror", "-i", path,
+                "-map", "0:v:0", "-map", "0:a?", "-f", "null", "NUL" };
+            using var validator = Process.Start(CreateProcessStartInfo(args, false, true, true))
+                ?? throw new InvalidOperationException("Could not start FFmpeg playback validation.");
+            var stdoutTask = validator.StandardOutput.ReadToEndAsync();
+            var stderrTask = validator.StandardError.ReadToEndAsync();
+            await validator.WaitForExitAsync();
+            var stdout = await stdoutTask;
+            var stderr = await stderrTask;
+            if (validator.ExitCode == 0) return true;
+
+            ErrorLogService.Write("ERROR", $"Recording failed full decode validation. Exit code={validator.ExitCode}; file={path}; FFmpeg output={stderr}{Environment.NewLine}{stdout}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            ErrorLogService.WriteException("Validate finalized recording", ex, path);
+            return false;
         }
     }
 
