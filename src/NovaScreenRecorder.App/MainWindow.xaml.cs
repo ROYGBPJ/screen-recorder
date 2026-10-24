@@ -344,7 +344,14 @@ public partial class MainWindow : Window
         // pipe, -shortest makes FFmpeg stop the mux even if live audio/device inputs remain
         // open. Without this, FFmpeg waits forever for DirectShow audio to end.
         if (_isWgcRecording) args.Add("-shortest");
-        if (extension == "mp4") args.AddRange(new[] { "-movflags", "+faststart" });
+        if (extension == "mp4")
+        {
+            // Fragmented MP4 writes its initialization metadata up front and commits
+            // media in fragments. If FFmpeg is interrupted, completed fragments can
+            // still be opened/re-muxed instead of losing the entire file to a missing
+            // end-of-file moov atom. Do not combine this with +faststart.
+            args.AddRange(new[] { "-movflags", "+empty_moov+default_base_moof+frag_keyframe", "-frag_duration", "1000000", "-flush_packets", "1" });
+        }
         args.Add(_currentOutput);
 
         try
