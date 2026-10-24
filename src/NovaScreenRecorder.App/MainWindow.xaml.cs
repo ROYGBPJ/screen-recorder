@@ -388,8 +388,20 @@ public partial class MainWindow : Window
             if (desktopAudio)
             {
                 _desktopAudioWav = Path.Combine(_outputFolder, $"{Path.GetFileNameWithoutExtension(_currentOutput)}.desktop-audio.wav");
-                _desktopAudioRecorder = new WasapiLoopbackRecorder(_desktopAudioWav);
-                await _desktopAudioRecorder.StartAsync();
+                try
+                {
+                    _desktopAudioRecorder = new WasapiLoopbackRecorder(_desktopAudioWav);
+                    await _desktopAudioRecorder.StartAsync();
+                }
+                catch (Exception audioEx)
+                {
+                    ErrorLogService.WriteException("Start WASAPI desktop audio", audioEx, _desktopAudioWav);
+                    try { _desktopAudioRecorder?.Dispose(); } catch { }
+                    _desktopAudioRecorder = null;
+                    try { if (File.Exists(_desktopAudioWav)) File.Delete(_desktopAudioWav); } catch { }
+                    _desktopAudioWav = null;
+                    _stopWarning = $"Desktop audio could not start; video recording will continue without it. Details: {audioEx.Message}";
+                }
             }
             _recordingIncludesMicrophone = mic;
             _recordingReady = true;
