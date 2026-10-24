@@ -793,6 +793,14 @@ public partial class MainWindow : Window
         }
     }
 
+    private static string BuildDirectShowInput(string mediaType, string deviceName)
+    {
+        // ArgumentList keeps this entire value in one argument. Do not embed
+        // shell-style quotes: FFmpeg treats them as literal device-name characters.
+        string name = deviceName.Trim().Trim('"');
+        return mediaType + "=" + name;
+    }
+
     private static void PopulateAudioDeviceCombo(System.Windows.Controls.ComboBox combo, IReadOnlyCollection<string> devices, string currentText)
     {
         string previousSelection = currentText.Trim().Trim('"');
