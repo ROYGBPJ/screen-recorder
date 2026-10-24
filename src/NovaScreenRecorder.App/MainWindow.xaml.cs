@@ -567,6 +567,7 @@ public partial class MainWindow : Window
             {
                 args.AddRange(new[] { "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k" });
             }
+            args.Add("-shortest");
             if (extension.Equals(".mp4", StringComparison.OrdinalIgnoreCase))
                 args.AddRange(new[] { "-movflags", "+faststart" });
             args.Add(muxedPath);
