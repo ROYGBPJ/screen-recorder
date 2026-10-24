@@ -66,6 +66,6 @@
                 </StackPanel></ScrollViewer>
             </Border>
         </Grid>
-        <DockPanel Grid.Row="2" Margin="2,12,2,0"><TextBlock DockPanel.Dock="Left" Text="NOVA • WINDOWS 11 • X64" Foreground="#FF71839B" VerticalAlignment="Center"/><TextBlock DockPanel.Dock="Right" Text="FFmpeg capture engine • Custom branding ready" Foreground="#FF71839B" VerticalAlignment="Center"/></DockPanel>
+        <DockPanel Grid.Row="2" Margin="2,12,2,0"><TextBlock DockPanel.Dock="Left" Text="NOVA • WINDOWS 11 • X64 • VERSION 5.5.9" Foreground="#FF71839B" VerticalAlignment="Center"/><TextBlock DockPanel.Dock="Right" Text="FFmpeg capture engine • Custom branding ready" Foreground="#FF71839B" VerticalAlignment="Center"/></DockPanel>
     </Grid>
 </Window>
