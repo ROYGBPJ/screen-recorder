@@ -131,7 +131,8 @@ jobs:
           $encoders = (& '.\artifacts\publish\win-x64\ffmpeg.exe' -hide_banner -encoders 2>&1 | Out-String)
           if ($encoders -notmatch '\bmpeg4\b') { throw 'Bundled FFmpeg has no MPEG-4 fallback encoder.' }
           $devices = (& '.\artifacts\publish\win-x64\ffmpeg.exe' -hide_banner -devices 2>&1 | Out-String)
-          if ($devices -notmatch '\bdshow\b') { throw 'Bundled FFmpeg has no DirectShow input support; microphone/webcam/Stereo Mix capture will not work.' }
+          if ($devices -notmatch '\bdshow\b') { throw 'Bundled FFmpeg has no DirectShow input support; microphone/webcam capture will not work.' }
+          if ($devices -notmatch '\bwasapi\b') { throw 'Bundled FFmpeg has no WASAPI input support; Windows desktop loopback audio will not work.' }
           $smoke = Join-Path $env:RUNNER_TEMP 'nova-ffmpeg-smoke.mp4'
           & '.\artifacts\publish\win-x64\ffmpeg.exe' -hide_banner -f lavfi -i 'testsrc=size=640x360:rate=30' -f lavfi -i 'sine=frequency=880:sample_rate=44100' -t 2 -c:v mpeg4 -q:v 4 -pix_fmt yuv420p -c:a aac -y $smoke
           if ($LASTEXITCODE -ne 0 -or !(Test-Path $smoke) -or (Get-Item $smoke).Length -lt 4096) { throw 'Bundled FFmpeg synthetic audio/video smoke test failed or produced an unexpectedly small file.' }
