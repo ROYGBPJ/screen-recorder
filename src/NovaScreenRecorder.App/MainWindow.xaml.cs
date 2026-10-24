@@ -517,9 +517,15 @@ public partial class MainWindow : Window
             string output = await p.StandardError.ReadToEndAsync(); await p.WaitForExitAsync();
             string path = Path.Combine(_outputFolder, "Nova-Audio-Devices.txt"); File.WriteAllText(path, output);
 
-            // Populate both audio-device dropdowns from FFmpeg's DirectShow audio device list.
+            // Populate audio and webcam dropdowns from FFmpeg's DirectShow device list.
             var audioDevices = System.Text.RegularExpressions.Regex.Matches(
                 output, "\\\"([^\\\"\\r\\n]+)\\\"\\s*\\(audio\\)", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+                .Select(m => m.Groups[1].Value.Trim())
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var videoDevices = System.Text.RegularExpressions.Regex.Matches(
+                output, "\\\"([^\\\"\\r\\n]+)\\\"\\s*\\(video\\)", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
                 .Select(m => m.Groups[1].Value.Trim())
                 .Where(name => !string.IsNullOrWhiteSpace(name))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -527,10 +533,9 @@ public partial class MainWindow : Window
 
             PopulateAudioDeviceCombo(MicDeviceBox, audioDevices, MicDeviceBox.Text);
             PopulateAudioDeviceCombo(DesktopAudioDeviceBox, audioDevices, DesktopAudioDeviceBox.Text);
+            PopulateAudioDeviceCombo(WebcamDeviceBox, videoDevices, WebcamDeviceBox.Text);
             SaveSettings();
-            MessageText.Text = audioDevices.Count > 0
-                ? $"Found {audioDevices.Count} DirectShow audio devices. Choose your microphone and desktop-audio device from their dropdowns; selections are saved automatically."
-                : $"No DirectShow audio devices were detected. Check the device list saved to {path}.";
+            MessageText.Text = $"Found {audioDevices.Count} DirectShow audio device(s) and {videoDevices.Count} webcam/video device(s). Choose devices from their dropdowns; selections are saved automatically.";
             Process.Start(new ProcessStartInfo("notepad.exe", path) { UseShellExecute = true });
         }
         catch (Exception ex) { ErrorLogService.WriteException("List audio devices", ex); ShowError($"Could not list audio devices: {ex.Message}"); }
@@ -559,6 +564,16 @@ public partial class MainWindow : Window
     }
 
     private void DesktopAudioDeviceBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (IsLoaded) SaveSettings();
+    }
+
+    private void WebcamDeviceBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (IsLoaded) SaveSettings();
+    }
+
+    private void WebcamDeviceBox_LostFocus(object sender, RoutedEventArgs e)
     {
         if (IsLoaded) SaveSettings();
     }
