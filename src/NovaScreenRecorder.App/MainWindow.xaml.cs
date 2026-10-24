@@ -654,7 +654,9 @@ public partial class MainWindow : Window
                 .ToList();
 
             PopulateAudioDeviceCombo(MicDeviceBox, audioDevices, MicDeviceBox.Text);
-            PopulateAudioDeviceCombo(DesktopAudioDeviceBox, audioDevices, DesktopAudioDeviceBox.Text);
+            string desktopPreferred = DesktopAudioDeviceBox.Text;
+            if (desktopPreferred.Trim().Equals("default", StringComparison.OrdinalIgnoreCase)) desktopPreferred = string.Empty;
+            PopulateAudioDeviceCombo(DesktopAudioDeviceBox, audioDevices, desktopPreferred);
             PopulateAudioDeviceCombo(WebcamDeviceBox, videoDevices, WebcamDeviceBox.Text);
             SaveSettings();
 
