@@ -378,6 +378,29 @@ public partial class MainWindow : Window
                 // Remove the broken container instead of leaving an MP4 that looks usable.
                 try { if (_currentOutput is not null && File.Exists(_currentOutput)) File.Delete(_currentOutput); }
                 catch (Exception ex) { ErrorLogService.WriteException("Remove failed startup output", ex, _currentOutput); }
+                if (_lastFfmpegInputFailure && !encoderRetry)
+                {
+                    bool microphoneFailed = MicCheckBox.IsChecked == true &&
+                        !string.IsNullOrWhiteSpace(MicDeviceBox.Text) &&
+                        ffmpegErrorText.Contains(MicDeviceBox.Text.Trim().Trim('"'), StringComparison.OrdinalIgnoreCase);
+                    bool webcamFailed = WebcamCheckBox.IsChecked == true &&
+                        !string.IsNullOrWhiteSpace(WebcamDeviceBox.Text) &&
+                        ffmpegErrorText.Contains(WebcamDeviceBox.Text.Trim().Trim('"'), StringComparison.OrdinalIgnoreCase);
+                    if (microphoneFailed)
+                    {
+                        MicCheckBox.IsChecked = false;
+                        _stopWarning = "The selected microphone could not be opened. Nova is retrying without microphone input; desktop loopback audio can still be recorded.";
+                        MessageText.Text = _stopWarning;
+                        await StartRecordingAsync(true, true); return;
+                    }
+                    if (webcamFailed)
+                    {
+                        WebcamCheckBox.IsChecked = false;
+                        _stopWarning = "The selected webcam could not be opened. Nova is retrying without the webcam overlay.";
+                        MessageText.Text = _stopWarning;
+                        await StartRecordingAsync(true, true); return;
+                    }
+                }
                 if (!_lastFfmpegInputFailure && _automaticEncoder && failedEncoder != "mpeg4" && _failedEncoders.Add(failedEncoder))
                 {
                     MessageText.Text = $"Encoder {failedEncoder} failed to initialize; retrying with the next available encoder.";
