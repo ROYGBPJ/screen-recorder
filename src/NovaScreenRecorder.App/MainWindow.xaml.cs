@@ -560,11 +560,12 @@ public partial class MainWindow : Window
 
     private static string BuildDirectShowInput(string mediaType, string deviceName)
     {
-        // Quotes must be part of the DirectShow input specification itself. ArgumentList
-        // protects the argument boundary but does not quote the device name for FFmpeg.
-        string name = deviceName.Trim().Trim('"').Replace("\\", "\\\\").Replace("\"", "\\\"");
-        return mediaType + "=\"" + name + "\"";
+        // ArgumentList already keeps this entire value in one argument. Do not embed
+        // shell-style quotes: FFmpeg treats them as literal device-name characters.
+        string name = deviceName.Trim().Trim('"');
+        return mediaType + "=" + name;
     }
+
     private static void PopulateAudioDeviceCombo(System.Windows.Controls.ComboBox combo, IReadOnlyCollection<string> devices, string currentText)
     {
         string previousSelection = currentText.Trim().Trim('"');
