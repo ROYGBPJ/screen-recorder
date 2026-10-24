@@ -8,6 +8,10 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <Version>5.5.9</Version>
+    <AssemblyVersion>5.5.9.0</AssemblyVersion>
+    <FileVersion>5.5.9.0</FileVersion>
+    <InformationalVersion>5.5.9</InformationalVersion>
     <AssemblyName>NovaScreenRecorder.App</AssemblyName>
     <RootNamespace>NovaScreenRecorder.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
