@@ -229,11 +229,12 @@ public partial class MainWindow : Window
             }
         }
         await DetectEncodersAsync();
-        if (MicCheckBox.IsChecked == true && string.IsNullOrWhiteSpace(MicDeviceBox.Text.Trim().Trim('"')))
+        bool combinedAudio = CombinedAudioCheckBox.IsChecked == true;
+        if ((combinedAudio || MicCheckBox.IsChecked == true) && string.IsNullOrWhiteSpace(MicDeviceBox.Text.Trim().Trim('"')))
         {
             ShowError("Choose the exact DirectShow microphone device, or turn microphone recording off."); return;
         }
-        if (DesktopAudioCheckBox.IsChecked == true && string.IsNullOrWhiteSpace(DesktopAudioDeviceBox.Text.Trim().Trim('"')))
+        if ((combinedAudio || DesktopAudioCheckBox.IsChecked == true) && string.IsNullOrWhiteSpace(DesktopAudioDeviceBox.Text.Trim().Trim('"')))
         {
             ShowError("Choose a DirectShow desktop-audio loopback device, such as Stereo Mix, or turn desktop audio off."); return;
         }
@@ -292,8 +293,10 @@ public partial class MainWindow : Window
             else args.AddRange(new[] { "-i", "desktop" });
         }
 
-        bool mic = MicCheckBox.IsChecked == true;
-        bool desktopAudio = DesktopAudioCheckBox.IsChecked == true;
+        // The combined option enables both live audio inputs and mixes them into the
+        // same output file while video is being encoded; no post-recording mux is needed.
+        bool mic = combinedAudio || MicCheckBox.IsChecked == true;
+        bool desktopAudio = combinedAudio || DesktopAudioCheckBox.IsChecked == true;
         bool webcam = WebcamCheckBox.IsChecked == true;
         if (webcam && string.IsNullOrWhiteSpace(WebcamDeviceBox.Text)) { ShowError("Enter the exact DirectShow webcam device name, or turn webcam overlay off."); return; }
         int webcamWidth = 320;
@@ -336,7 +339,11 @@ public partial class MainWindow : Window
         else if (_activeEncoder == "h264_mf") args.AddRange(new[] { "-b:v", SelectedBitrate() });
         else if (_activeEncoder == "mpeg4") args.AddRange(new[] { "-q:v", SelectedMpeg4Quality().ToString() });
         args.AddRange(new[] { "-r", fps.ToString() });
-        if (mic) args.AddRange(new[] { "-c:a", "aac", "-b:a", "192k" });
+        if (mic || desktopAudio) args.AddRange(new[] { "-c:a", "aac", "-b:a", "192k" });
+        // Native capture feeds raw video through stdin. Once the frame pump closes that
+        // pipe, -shortest makes FFmpeg stop the mux even if live audio/device inputs remain
+        // open. Without this, FFmpeg waits forever for DirectShow audio to end.
+        if (_isWgcRecording) args.Add("-shortest");
         if (extension == "mp4") args.AddRange(new[] { "-movflags", "+faststart" });
         args.Add(_currentOutput);
 
